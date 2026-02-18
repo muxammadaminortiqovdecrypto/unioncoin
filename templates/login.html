@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Login - UnionCoin{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+.auth-container {
+    max-width: 400px;
+    margin: 80px auto;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.auth-icon {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.auth-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--dark-color);
+    margin-bottom: 10px;
+}
+
+.auth-subtitle {
+    color: #6b7280;
+    font-size: 1rem;
+}
+
+.auth-form {
+    background: white;
+    padding: 40px;
+    border-radius: var(--border-radius);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 1.1rem;
+}
+
+.form-control {
+    padding-left: 45px;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.auth-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.auth-link:hover {
+    color: var(--secondary-color);
+}
+
+.divider {
+    text-align: center;
+    margin: 30px 0;
+    position: relative;
+}
+
+.divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.divider span {
+    background: white;
+    padding: 0 15px;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
+
+.social-auth {
+    display: flex;
+    gap: 15px;
+}
+
+.social-btn {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+    text-decoration: none;
+    color: var(--dark-color);
+}
+
+.social-btn:hover {
+    border-color: var(--primary-color);
+    background: rgba(99, 102, 241, 0.05);
+    transform: translateY(-2px);
+}
+
+.social-btn i {
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.social-btn span {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+@media (max-width: 480px) {
+    .auth-container {
+        margin: 40px 20px;
+    }
+    
+    .auth-form {
+        padding: 30px 20px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="auth-container">
+        <div class="auth-header fade-in">
+            <div class="auth-icon">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <h1 class="auth-title">Welcome Back</h1>
+            <p class="auth-subtitle">Login to your UnionCoin wallet</p>
+        </div>
+        
+        <div class="auth-form card fade-in">
+            {% if error %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ error }}
+            </div>
+            {% endif %}
+            
+            <form method="post" action="/login">
+                <div class="form-group">
+                    <label class="form-label" for="wallet_address">
+                        <i class="fas fa-key"></i>
+                        Wallet Address
+                    </label>
+                    <div class="input-group">
+                        <i class="fas fa-wallet input-icon"></i>
+                        <input 
+                            type="text" 
+                            id="wallet_address" 
+                            name="wallet_address" 
+                            class="form-control" 
+                            placeholder="Enter your 12-char wallet address"
+                            required
+                            maxlength="12"
+                            pattern="[a-z0-9]{12}"
+                            title="Wallet address must be 12 alphanumeric characters"
+                        >
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Login to Wallet
+                </button>
+            </form>
+            
+            <div class="divider">
+                <span>OR</span>
+            </div>
+            
+            <div class="social-auth">
+                <a href="/register" class="social-btn">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Create Wallet</span>
+                </a>
+                <a href="/api/data" class="social-btn">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>View Data</span>
+                </a>
+            </div>
+        </div>
+        
+        <div class="auth-footer">
+            <p>Don't have a wallet? <a href="/register" class="auth-link">Create one now</a></p>
+            <p style="margin-top: 10px; font-size: 0.9rem; color: #9ca3af;">
+                <i class="fas fa-shield-alt"></i>
+                Your wallet is secured with blockchain technology
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-format wallet address
+document.getElementById('wallet_address').addEventListener('input', function(e) {
+    this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '');
+});
+
+// Add wallet address validation feedback
+document.getElementById('wallet_address').addEventListener('blur', function() {
+    const value = this.value.trim();
+    if (value && value.length === 12 && /^[a-z0-9]{12}$/.test(value)) {
+        this.style.borderColor = 'var(--success-color)';
+    } else if (value) {
+        this.style.borderColor = 'var(--danger-color)';
+    }
+});
+
+// Focus on wallet address input
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('wallet_address').focus();
+});
+</script>
+{% endblock %}
