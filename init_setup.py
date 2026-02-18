@@ -541,73 +541,129 @@ def create_templates(base_dir):
     (base_dir / "templates" / "login.html").write_text(login_html)
     (base_dir / "templates" / "dashboard.html").write_text(dashboard_html)
 
+def create_run_py(base_dir):
+    """Create a unified entry point for Render/Railway"""
+    run_code = '''import asyncio
+import logging
+import uvicorn
+from api import app as web_app
+from bot import dp, bot, init_db
+import os
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+async def main():
+    init_db()
+    port = int(os.getenv("PORT", 8000))
+    config = uvicorn.Config(app=web_app, host="0.0.0.0", port=port, loop="asyncio")
+    server = uvicorn.Server(config)
+    logger.info(f"Starting UnionCoin Ecosystem on port {port}...")
+    await asyncio.gather(server.serve(), dp.start_polling(bot))
+
+if __name__ == "__main__":
+    asyncio.run(main())
+'''
+    (base_dir / "run.py").write_text(run_code)
+
+def create_procfile(base_dir):
+    """Create Procfile for deployment"""
+    (base_dir / "Procfile").write_text("web: python run.py\n")
+
+def create_static_files(base_dir):
+    """Create premium CSS themes"""
+    css_content = '''/* UnionCoin Crypto Theme */
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --accent-glow: #00d4ff;
+    --dark-bg: #0f0f23;
+    --card-bg: rgba(255, 255, 255, 0.05);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --text-primary: #ffffff;
+    --text-secondary: #b8bcc8;
+}
+
+body {
+    background: var(--dark-bg);
+    background-image: radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.1) 0%, transparent 50%);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+}
+
+.crypto-particle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: var(--accent-glow);
+    border-radius: 50%;
+    animation: floatUp 15s infinite linear;
+    opacity: 0;
+}
+
+@keyframes floatUp {
+    0% { transform: translateY(100vh); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateY(-100vh); opacity: 0; }
+}
+
+.btn-crypto {
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 28px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-crypto:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6); }
+
+.crypto-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: white;
+    width: 100%;
+}
+'''
+    (base_dir / "static" / "css").mkdir(exist_ok=True)
+    (base_dir / "static" / "css" / "crypto-theme.css").write_text(css_content)
+
 def main():
     """Main initialization function"""
-    print("Initializing Token Ecosystem...")
-    
-    # Create directory structure
+    print("Initializing UnionCoin Professional Token Ecosystem...")
     base_dir = create_directory_structure()
-    print(f"Created directory structure at {base_dir}")
     
-    # Create all files
     create_requirements_txt(base_dir)
     create_database_py(base_dir)
     create_bot_py(base_dir)
     create_api_py(base_dir)
     create_verify_py(base_dir)
     create_templates(base_dir)
+    create_static_files(base_dir)
+    create_run_py(base_dir)
+    create_procfile(base_dir)
     
-    print("Created all project files")
-    
-    # Create README
-    readme = '''# UnionCoin Token Ecosystem
-
-Production-grade token system with Telegram bot, web interface, and PostgreSQL backend.
-
-## Features
-- Blockchain hash-chain verification
-- Telegram bot with admin approval
-- Web wallet for P2P transfers
-- Tamper-proof transaction records
-
-## Quick Start
-
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Set up PostgreSQL database and update DATABASE_URL
-
-3. Initialize database:
-   ```bash
-   python database.py
-   ```
-
-4. Run Telegram bot:
-   ```bash
-   python bot.py
-   ```
-
-5. Run web server:
-   ```bash
-   python api.py
-   ```
-
-6. Verify blockchain integrity:
-   ```bash
-   python verify.py
-   ```
+    # Create .env.example
+    env_example = '''DATABASE_URL=postgresql://user:password@localhost/unioncoin
+BOT_TOKEN=your_telegram_bot_token
+ADMIN_ID=your_telegram_id
+SECRET_KEY=your_secret_key
+ADMIN_PASSWORD=unioncoin_admin_2026
+PORT=8000
 '''
-    (base_dir / "README.md").write_text(readme)
+    (base_dir / ".env.example").write_text(env_example)
     
-    print(f"\\nToken Ecosystem initialized successfully at {base_dir}")
-    print("\\nNext steps:")
-    print("1. Install dependencies: pip install -r requirements.txt")
-    print("2. Set up PostgreSQL database")
-    print("3. Run: python database.py")
-    print("4. Run: python bot.py")
-    print("5. Run: python api.py")
+    print(f"\nFinal Professional Ecosystem setup complete at {base_dir}")
+    print("\nNext steps:")
+    print("1. Update .env with your credentials")
+    print("2. Run 'python run.py' to start everything!")
 
 if __name__ == "__main__":
     main()
