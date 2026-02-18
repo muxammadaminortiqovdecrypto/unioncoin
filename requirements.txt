@@ -19,3 +19,4 @@ redis==5.0.1
 celery==5.3.4
 flower==2.0.1
 sentry-sdk==1.40.6
+paramiko==3.3.1
