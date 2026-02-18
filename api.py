@@ -3,12 +3,12 @@ FastAPI Web Server for P2P Token Transfers
 """
 
 from fastapi import FastAPI, Request, Form, HTTPException, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from database import get_db, User, Transaction, create_transaction, verify_chain_integrity
-from typing import Optional
+from typing import Optional, List
 import os
 import random
 import string
@@ -26,26 +26,22 @@ async def home_page(request: Request):
 
 @app.get("/api/user-accounts")
 async def get_user_accounts(request: Request, db: Session = Depends(get_db)):
-    """Get user accounts for crypto dashboard"""
-    # For demo, return sample accounts
-    # In production, this would get actual user accounts based on session/auth
-    sample_accounts = [
-        {
-            "username": "abd",
-            "wallet_address": "abc123def456",
-            "balance": 1000.0,
-            "is_primary": True,
-            "profile_color": "#667eea"
-        },
-        {
-            "username": "abd_acc2", 
-            "wallet_address": "def789ghi012",
-            "balance": 1000.0,
-            "is_primary": False,
-            "profile_color": "#f093fb"
-        }
-    ]
-    return JSONResponse(content=sample_accounts)
+    """Get all user accounts for the dashboard"""
+    # In a real app, we would filter by logged-in user
+    # For this demo, let's show all users as "available accounts" to switch between
+    users = db.query(User).all()
+    
+    accounts = []
+    for user in users:
+        accounts.append({
+            "username": user.username,
+            "wallet_address": user.wallet_address,
+            "balance": user.balance,
+            "is_primary": user.is_primary,
+            "profile_color": user.profile_color or "#667eea"
+        })
+    
+    return JSONResponse(content=accounts)
 
 @app.get("/api/stats")
 async def get_stats(db: Session = Depends(get_db)):
