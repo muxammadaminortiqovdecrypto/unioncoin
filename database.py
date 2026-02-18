@@ -12,7 +12,11 @@ from datetime import datetime
 from typing import Optional, List
 
 # Database configuration
+# For development with SQLite
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./unioncoin.db")
+
+# For production with PostgreSQL (uncomment below)
+# DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:12345@localhost/unioncoin")
 
 Base = declarative_base()
 engine = create_engine(DATABASE_URL)
