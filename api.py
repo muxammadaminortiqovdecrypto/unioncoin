@@ -19,10 +19,49 @@ app = FastAPI(title="UnionCoin Web Wallet")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Home page"""
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/")
+async def home_page(request: Request):
+    """Home page with crypto theme"""
+    return templates.TemplateResponse("crypto_dashboard.html", {"request": request})
+
+@app.get("/api/user-accounts")
+async def get_user_accounts(request: Request, db: Session = Depends(get_db)):
+    """Get user accounts for crypto dashboard"""
+    # For demo, return sample accounts
+    # In production, this would get actual user accounts based on session/auth
+    sample_accounts = [
+        {
+            "username": "abd",
+            "wallet_address": "abc123def456",
+            "balance": 1000.0,
+            "is_primary": True,
+            "profile_color": "#667eea"
+        },
+        {
+            "username": "abd_acc2", 
+            "wallet_address": "def789ghi012",
+            "balance": 1000.0,
+            "is_primary": False,
+            "profile_color": "#f093fb"
+        }
+    ]
+    return JSONResponse(content=sample_accounts)
+
+@app.get("/api/stats")
+async def get_stats(db: Session = Depends(get_db)):
+    """Get system statistics"""
+    users = db.query(User).all()
+    transactions = db.query(Transaction).all()
+    
+    total_balance = sum(user.balance for user in users)
+    
+    return JSONResponse(content={
+        "totalUsers": len(users),
+        "totalSupply": total_balance,
+        "totalTransactions": len(transactions),
+        "webUsers": len([u for u in users if u.tg_id is None]),
+        "telegramUsers": len([u for u in users if u.tg_id is not None])
+    })
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):

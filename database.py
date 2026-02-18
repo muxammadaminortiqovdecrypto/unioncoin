@@ -41,6 +41,8 @@ class User(Base):
     balance = Column(Float, default=1000.0)  # Welcome bonus
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
+    is_primary = Column(Boolean, default=False)  # Primary account for multi-account users
+    profile_color = Column(String, default="#667eea")  # Profile theme color
     
     sent_transactions = relationship("Transaction", foreign_keys="Transaction.sender_id", back_populates="sender")
     received_transactions = relationship("Transaction", foreign_keys="Transaction.receiver_id", back_populates="receiver")

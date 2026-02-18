@@ -31,51 +31,95 @@
 - **Bot**: aiogram 3.x
 - **Deployment**: Docker, Docker Compose
 
-## Quick Start
+## 🚀 Production Deployment
 
-### Local Development
+### Option 1: Computer as Server (Recommended for testing)
 
-1. **Clone Repository**
+Turn your current computer into a production server:
+
 ```bash
-git clone https://github.com/yourusername/unioncoin.git
-cd unioncoin
+# Start server mode
+python server_mode.py
+
+# Interactive mode
+python server_mode.py --interactive
 ```
 
-2. **Install Dependencies**
+**Features:**
+- 🖥️ Auto-restart services if they crash
+- 📊 Automatic backup every 6 hours
+- 🔍 Service monitoring and status
+- 🎮 Interactive command interface
+- 📋 Real-time log viewing
+
+### Option 2: Online Server Deployment
+
 ```bash
-pip install -r requirements.txt
+# Run deployment script
+python deploy.py
+
+# Manual deployment to cloud server
 ```
 
-3. **Initialize Database**
+**Server Requirements:**
+- Ubuntu 20.04+ / CentOS 8+
+- 2GB+ RAM
+- 20GB+ Storage
+- Python 3.8+
+- PostgreSQL 13+
+- Nginx
+- SSL Certificate
+
+### Option 3: Docker Deployment
+
 ```bash
-python database.py
-```
-
-4. **Start Services**
-```bash
-# Terminal 1 - Web Server
-python api.py
-
-# Terminal 2 - Telegram Bot
-python bot.py
-```
-
-5. **Access Application**
-- Web Interface: `http://localhost:8000`
-- Data Viewer: `http://localhost:8000/api/data?admin=unioncoin_admin_2026`
-
-### Docker Deployment
-
-1. **Environment Setup**
-```bash
-cp .env.example .env
-# Edit .env with your credentials
-```
-
-2. **Deploy with Docker Compose**
-```bash
+# Build and deploy
 docker-compose up -d
+
+# Production Dockerfile
+docker build -t unioncoin-prod .
+docker run -d -p 8000:8000 unioncoin-prod
 ```
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# Production (.env.production)
+DATABASE_URL=postgresql://user:password@localhost/unioncoin
+BOT_TOKEN=your_bot_token
+ADMIN_ID=your_telegram_id
+DOMAIN=yourdomain.com
+```
+
+### Security Setup
+```bash
+# SSL with Let's Encrypt
+sudo certbot --nginx -d yourdomain.com
+
+# Firewall setup
+sudo ufw allow 22,80,443
+sudo ufw enable
+```
+
+## 📊 Monitoring & Backup
+
+### Automatic Backup
+- **Frequency:** Every 6 hours
+- **Format:** Excel files
+- **Location:** `server_backups/` directory
+- **Includes:** Users and transactions data
+
+### Service Monitoring
+- **Web Server:** HTTP/HTTPS checks
+- **Bot Status:** Process monitoring
+- **Database:** Connection health
+- **Auto-restart:** Failed services
+
+### Admin Notifications
+- **Email alerts** for service failures
+- **Telegram notifications** for critical errors
+- **Daily reports** with statistics
 
 ## Project Structure
 
