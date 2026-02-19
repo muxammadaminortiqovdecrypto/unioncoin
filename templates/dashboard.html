@@ -206,20 +206,43 @@
                 </div>
 
                 <div class="transaction-list-premium">
+                    {% if transactions %}
+                    {% for tx in transactions %}
                     <div class="transaction-item-premium">
                         <div class="d-flex align-items-center">
                             <div class="stat-icon me-3 mb-0" style="width: 45px; height: 45px; font-size: 1.2rem;">
+                                {% if tx.transaction_type == 'bonus' or tx.transaction_type == 'welcome_bonus' %}
                                 <i class="fas fa-gift"></i>
+                                {% elif tx.sender_id == user.id %}
+                                <i class="fas fa-arrow-up text-danger"></i>
+                                {% else %}
+                                <i class="fas fa-arrow-down text-success"></i>
+                                {% endif %}
                             </div>
                             <div>
-                                <div class="fw-bold">Welcome Bonus</div>
-                                <div class="small opacity-50">System Distribution</div>
+                                <div class="fw-bold">
+                                    {% if tx.transaction_type == 'bonus' or tx.transaction_type == 'welcome_bonus' %}
+                                    Welcome Bonus
+                                    {% elif tx.sender_id == user.id %}
+                                    Sent Tokens
+                                    {% else %}
+                                    Received Tokens
+                                    {% endif %}
+                                </div>
+                                <div class="small opacity-50">{{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
                             </div>
                         </div>
-                        <div class="amount-plus">+1,000.00 UC</div>
+                        <div class="{% if tx.receiver_id == user.id %}amount-plus{% else %}amount-minus{% endif %}">
+                            {% if tx.receiver_id == user.id %}+{% else %}-{% endif %}{{ "%.2f"|format(tx.amount) }} UC
+                        </div>
                     </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-center py-4 opacity-50 small">
+                        No transactions found yet.
+                    </div>
+                    {% endif %}
 
-                    <!-- We'll populate more here via API later if needed -->
                     <div class="text-center py-4 opacity-50 small">
                         Blockchain integrity verified <i class="fas fa-shield-alt text-success ms-1"></i>
                     </div>

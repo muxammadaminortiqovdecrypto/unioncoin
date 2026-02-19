@@ -8,4 +8,10 @@ pydantic==2.5.0
 python-dotenv==1.0.0
 itsdangerous==2.1.2
 psycopg2-binary==2.9.9
-# The system will use SQLite locally, and PostgreSQL on Render/Neon.
+cryptography>=41.0.0
+passlib[bcrypt]==1.7.4
+requests==2.31.0
+pandas==2.1.4
+openpyxl==3.1.2
+schedule==1.2.0
+python-magic==0.4.27

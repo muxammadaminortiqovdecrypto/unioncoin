@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
-from database import get_db, User, Transaction, create_transaction, verify_chain_integrity
+from database import get_db, User, Transaction, create_transaction, verify_chain_integrity, verify_password, get_password_hash
 from typing import Optional, List
 import os
 import random
@@ -20,7 +20,17 @@ app = FastAPI(title="UnionCoin Web Wallet")
 
 # Add Session Middleware for cookie-based authentication
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-12345")
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+# production settings for cookies
+IS_PROD = os.getenv("RENDER", False) or os.getenv("PORT", False)
+
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key=SECRET_KEY,
+    session_cookie="unioncoin_session",
+    max_age=3600 * 24, # 24 hours
+    same_site="lax",
+    https_only=True if IS_PROD else False
+)
 
 # Setup templates and static files
 templates = Jinja2Templates(directory="templates")
@@ -163,9 +173,15 @@ async def dashboard_page(request: Request, db: Session = Depends(get_db)):
         request.session.clear()
         return RedirectResponse(url="/login")
     
+    # Get user transactions (Isolation)
+    transactions = db.query(Transaction).filter(
+        (Transaction.sender_id == user.id) | (Transaction.receiver_id == user.id)
+    ).order_by(Transaction.id.desc()).all()
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "user": user
+        "user": user,
+        "transactions": transactions
     })
 
 @app.get("/logout")
@@ -222,6 +238,12 @@ async def verify_blockchain(db: Session = Depends(get_db)):
     is_valid = verify_chain_integrity(db)
     return {"blockchain_valid": is_valid}
 
+async def get_current_admin(request: Request):
+    """Dependency to check if user is admin"""
+    if not request.session.get("is_admin"):
+        raise HTTPException(status_code=401, detail="Admin access required")
+    return True
+
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
     """Admin login page"""
@@ -229,21 +251,31 @@ async def admin_login_page(request: Request):
 
 @app.post("/admin/login")
 async def admin_login(request: Request, password: str = Form(...)):
-    """Handle admin login"""
-    if password == os.getenv("ADMIN_PASSWORD", "unioncoin_admin_2026"):
+    """Handle admin login with hashed password check"""
+    # In a real app, this hash would be stored in DB or Env
+    admin_hash = os.getenv("ADMIN_PASSWORD_HASH")
+    raw_admin_pass = os.getenv("ADMIN_PASSWORD", "unioncoin_admin_2026")
+    
+    # If no hash in env, we compare against raw for now but recommend setting hash
+    if admin_hash:
+        is_valid = verify_password(password, admin_hash)
+    else:
+        is_valid = (password == raw_admin_pass)
+        
+    if is_valid:
         request.session["is_admin"] = True
-        return RedirectResponse(url="/api/data", status_code=303)
+        # Set a session timestamp to prevent session fixation or old sessions
+        request.session["admin_session_start"] = datetime.utcnow().isoformat()
+        return RedirectResponse(url="/api/data", status_code=302)
+    
     return templates.TemplateResponse("admin_login.html", {
         "request": request,
         "error": "Access Denied: Invalid Admin Password"
     })
 
 @app.get("/api/data", response_class=HTMLResponse)
-async def view_data_api(request: Request, db: Session = Depends(get_db)):
+async def view_data_api(request: Request, db: Session = Depends(get_db), admin: bool = Depends(get_current_admin)):
     """View all data via API (ADMIN ONLY)"""
-    if not request.session.get("is_admin"):
-        return RedirectResponse(url="/admin/login")
-    
     users = db.query(User).all()
     transactions = db.query(Transaction).order_by(Transaction.id.desc()).limit(10).all()
     

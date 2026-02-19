@@ -5,6 +5,7 @@ Database Models and Blockchain Hash-Chain Logic
 import os
 import hashlib
 import sqlalchemy
+from passlib.context import CryptContext
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, ForeignKey, BigInteger
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -21,6 +22,15 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./unioncoin.db")
 Base = declarative_base()
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_db():
     """Get database session"""
