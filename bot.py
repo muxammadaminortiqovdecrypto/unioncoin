@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from sqlalchemy.orm import Session
-from database import get_db, User, Transaction, create_transaction, init_db
+from database import get_db, User, Transaction, create_transaction, init_db, generate_mnemonic
 import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -64,12 +64,16 @@ def get_or_create_user(db: Session, tg_id: int, username: str, referrer_code: st
             if referrer:
                 referred_by_id = referrer.id
         
+        # Generate unique seed phrase for V2 recovery
+        seed_phrase = generate_mnemonic()
+        
         user = User(
             tg_id=tg_id,
             username=username,
             wallet_address=wallet_address,
             referral_code=referral_code,
             referred_by_id=referred_by_id,
+            seed_phrase=seed_phrase,
             balance=1000.0,  # Welcome bonus
             is_primary=True,
             profile_color=random.choice(["#667eea", "#f093fb", "#4facfe", "#fa709a", "#fee140", "#00d4ff"])
@@ -119,32 +123,36 @@ async def start_command(message: types.Message):
             referrer_code
         )
         
-        # Main keyboard
+        # Get domain for Mini App
+        domain = os.getenv("DOMAIN", "unioncoin.render.com")
+        web_app_url = f"https://{domain}/dashboard?user_id={user.id}"
+        
+        # Main keyboard with Launch App button (Pro Spec)
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💰 Daily Bonus", callback_data=f"daily_{user.id}")],
-            [InlineKeyboardButton(text="💳 Wallet", callback_data=f"profile_{user.id}"),
-             InlineKeyboardButton(text="📊 Stats", callback_data=f"balance_{user.id}")],
-            [InlineKeyboardButton(text="📤 Send", callback_data=f"send_{user.id}"),
+            [InlineKeyboardButton(text="🚀 Open WebApp", web_app=types.WebAppInfo(url=web_app_url))],
+            [InlineKeyboardButton(text="💰 Claim Tokens", callback_data=f"claim_{user.id}")],
+            [InlineKeyboardButton(text="🎁 Daily Reward", callback_data=f"daily_{user.id}")],
+            [InlineKeyboardButton(text="💳 Check Balance", callback_data=f"profile_{user.id}"),
              InlineKeyboardButton(text="👥 Referrals", callback_data=f"referral_{user.id}")],
-            [InlineKeyboardButton(text="📜 History", callback_data=f"history_{user.id}")],
-            [InlineKeyboardButton(text="💼 Accounts", callback_data=f"accounts_{user.tg_id}")]
+            [InlineKeyboardButton(text="📜 History", callback_data=f"history_{user.id}"),
+             InlineKeyboardButton(text="🔑 Recovery Phrase", callback_data=f"recovery_{user.id}")],
+            [InlineKeyboardButton(text="💼 Switch Account", callback_data=f"accounts_{user.tg_id}")]
         ])
         
+        # Pro Welcome Text
         welcome_text = f"""
-🚀 **Welcome to UnionCoin!** 🚀
+✨ **UNIONCOIN PRO** ✨
+The most advanced token ecosystem on Telegram.
 
-👤 **Profile:** @{user.username}
-💳 **Wallet:** `{user.wallet_address}`
+👤 **User:** @{user.username}
+🆔 **Wallet:** `0x{user.wallet_address[:4]}...{user.wallet_address[-4:]}`
 💰 **Balance:** {user.balance:.2f} UC
-🎟️ **Ref Code:** `{user.referral_code}`
 
-✨ **New Features:**
-• 🎁 `/daily` - Claim free UC every day!
-• 💸 `/transfer` - Send UC to anyone
-• 👥 `/referral` - Invite friends and earn
-• 📜 `/history` - View your transactions
+🔒 **Recovery Seed (Private):**
+`{user.seed_phrase}`
+*(Save this! It is the ONLY way to recover your account)*
 
-Select an option below to getting started!
+👇 **Select an option below to manage your assets:**
         """
         await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
 
@@ -324,51 +332,180 @@ async def handle_close(callback: CallbackQuery):
     await callback.message.delete()
     await callback.answer()
 
-@dp.message(Command("balance"))
-async def balance_command(message: types.Message):
-    """Handle /balance command"""
+@dp.callback_query(lambda c: c.data.startswith('claim_'))
+async def handle_token_request(callback: CallbackQuery):
+    """Handle user request for tokens (Pro Request System)"""
+    user_id = int(callback.data.split('_')[1])
+    amount = 1000.0 # Default request amount
+    
     with next(get_db()) as db:
-        user = db.query(User).filter(User.tg_id == message.from_user.id).first()
-        if user:
-            await message.answer(f"💰 **Balance:** {user.balance:.2f} UC\n💳 **Wallet:** `{user.wallet_address}`", parse_mode="Markdown")
-        else:
-            await message.answer("Please use /start to register first.")
-
-@dp.message(Command("daily"))
-async def daily_command(message: types.Message):
-    """Handle daily bonus command"""
-    with next(get_db()) as db:
-        user = db.query(User).filter(User.tg_id == message.from_user.id).first()
+        user = db.get(User, user_id)
         if not user:
-            await message.answer("Please use /start to register first.")
+            await callback.answer("User not found!")
+            return
+            
+        # Create a Pending transaction
+        tx = create_transaction(db, 0, user.id, amount, "admin_request", False)
+        tx.status = "Pending"
+        db.add(tx)
+        db.commit()
+        db.refresh(tx)
+        
+        # Notify Admin with inline buttons
+        admin_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Approve ✅", callback_data=f"tx_approve_{tx.id}"),
+             InlineKeyboardButton(text="Reject ❌", callback_data=f"tx_reject_{tx.id}")]
+        ])
+        
+        admin_text = f"""
+🚨 **NEW TOKEN REQUEST** 🚨
+👤 User: @{user.username}
+💰 Amount: {amount} UC
+📅 Time: {datetime.now().strftime('%H:%M:%S')}
+
+Action required:
+        """
+        await bot.send_message(ADMIN_ID, admin_text, reply_markup=admin_kb, parse_mode="Markdown")
+        await callback.answer("Request sent to Admin! Status: Pending.", show_alert=True)
+
+@dp.callback_query(lambda c: c.data.startswith('tx_'))
+async def handle_admin_tx_action(callback: CallbackQuery):
+    """Admin Approves or Rejects a pending transaction"""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Admin only!", show_alert=True)
+        return
+        
+    action, tx_id = callback.data.split('_')[1], int(callback.data.split('_')[2])
+    
+    with next(get_db()) as db:
+        tx = db.get(Transaction, tx_id)
+        if not tx or tx.status != "Pending":
+            await callback.answer("Transaction not found or already processed!")
+            return
+            
+        user = db.get(User, tx.receiver_id)
+        
+        if action == "approve":
+            tx.status = "Approved"
+            tx.is_approved = True
+            user.balance += tx.amount
+            
+            # Generate unique Tx Hash (SHA-256)
+            tx_data = f"{tx.id}-{tx.sender_id}-{tx.receiver_id}-{tx.amount}-{tx.timestamp}"
+            tx.tx_hash = hashlib.sha256(tx_data.encode()).hexdigest()
+            
+            db.commit()
+            
+            await bot.send_message(user.tg_id, f"✅ **Request Approved!**\n+{tx.amount} UC added to your wallet.\nHash: `{tx.tx_hash[:16]}...`", parse_mode="Markdown")
+            await callback.message.edit_text(f"✅ Approved @{user.username}'s request.")
+        else:
+            tx.status = "Rejected"
+            db.commit()
+            await bot.send_message(user.tg_id, "❌ **Request Rejected** by Admin.")
+            await callback.message.edit_text(f"❌ Rejected @{user.username}'s request.")
+
+@dp.callback_query(lambda c: c.data.startswith('profile_'))
+async def profile_callback(callback: CallbackQuery):
+    """Pro Wallet Profile with 0x... format"""
+    user_id = int(callback.data.split('_')[1])
+    with next(get_db()) as db:
+        user = db.get(User, user_id)
+        
+        # Abbreviate wallet
+        addr = user.wallet_address
+        short_addr = f"0x{addr[:4]}...{addr[-4:]}"
+        
+        text = f"""
+💎 **UNIONCOIN PRO WALLET** 💎
+
+👤 **User:** @{user.username}
+🆔 **Address:** `{short_addr}`
+💰 **Balance:** {user.balance:.2f} UC
+
+⚡ **Account Status:** ✅ SECURED
+        """
+        await callback.message.answer(text, parse_mode="Markdown")
+        await callback.answer()
+
+@dp.callback_query(lambda c: c.data.startswith('daily_'))
+async def handle_daily_callback(callback: CallbackQuery):
+    """Handle daily bonus button"""
+    user_id = int(callback.data.split('_')[1])
+    with next(get_db()) as db:
+        user = db.get(User, user_id)
+        if not user:
+            await callback.answer("User not found!")
             return
             
         now = datetime.utcnow()
         if user.last_daily_claim and (now - user.last_daily_claim) < timedelta(days=1):
-            next_claim = user.last_daily_claim + timedelta(days=1)
-            remaining = next_claim - now
-            hours, remainder = divmod(int(remaining.total_seconds()), 3600)
-            minutes, _ = divmod(remainder, 60)
-            await message.answer(f"⏳ **Already claimed!**\n\nCome back in **{hours}h {minutes}m**.")
+            await callback.answer("⏳ Already claimed today!", show_alert=True)
             return
             
         bonus_amount = 100.0
         user.balance += bonus_amount
         user.last_daily_claim = now
-        
         tx = create_transaction(db, 0, user.id, bonus_amount, "daily_bonus", True)
         db.add(tx)
         db.commit()
         
-        await message.answer(f"🎁 **DAILY BONUS!** 🎁\n\nYou received **{bonus_amount} UC**!\nCurrent balance: **{user.balance:.2f} UC**")
+        await callback.answer(f"🎁 +{bonus_amount} UC added!", show_alert=True)
+        await callback.message.edit_text(
+            f"{callback.message.text}\n\n✅ **Claimed +100 UC!**",
+            reply_markup=callback.message.reply_markup,
+            parse_mode="Markdown"
+        )
 
-@dp.callback_query(lambda c: c.data.startswith('daily_'))
-async def handle_daily_callback(callback: CallbackQuery):
-    """Handle daily bonus button"""
-    # Simply call the command logic or repeat it
-    await callback.answer("Claiming daily bonus...")
-    # For now, just send the command message
-    await daily_command(callback.message)
+@dp.callback_query(lambda c: c.data.startswith('recovery_'))
+async def handle_recovery_callback(callback: CallbackQuery):
+    """Securely show recovery phrase"""
+    user_id = int(callback.data.split('_')[1])
+    if callback.from_user.id != ADMIN_ID: # Allow admin to view for support or check own user_id
+        # In a real app, we'd verify the callback.from_user.id matches user.tg_id
+        pass
+
+    with next(get_db()) as db:
+        user = db.get(User, user_id)
+        if not user or user.tg_id != callback.from_user.id:
+            await callback.answer("Access Denied!", show_alert=True)
+            return
+            
+        text = f"""
+🔑 **ACCOUNT RECOVERY KEY** 🔑
+
+This phrase is the ONLY way to recover your wallet if you lose access.
+
+`{user.seed_phrase}`
+
+⚠️ **CRITICAL:**
+- Never share this with anyone.
+- Admin will NEVER ask for this phrase.
+- Store it in a safe, offline place.
+        """
+        await callback.message.answer(text, parse_mode="Markdown")
+        await callback.answer("Phrase displayed.")
+
+@dp.callback_query(lambda c: c.data.startswith('referral_'))
+async def handle_referral_callback(callback: CallbackQuery):
+    """Show referral info"""
+    user_id = int(callback.data.split('_')[1])
+    with next(get_db()) as db:
+        user = db.get(User, user_id)
+        bot_info = await bot.get_me()
+        ref_link = f"https://t.me/{bot_info.username}?start={user.referral_code}"
+        ref_count = db.query(User).filter(User.referred_by_id == user.id).count()
+        
+        text = f"""
+👥 **REFERRAL PROGRAM V2** 👥
+
+Invite friends and earn **200 UC** each!
+
+🔗 **Invite Link:** `{ref_link}`
+📊 **Referred Users:** {ref_count}
+💰 **Total Earned:** {ref_count * 200} UC
+        """
+        await callback.message.answer(text, parse_mode="Markdown")
+        await callback.answer()
 
 @dp.message(Command("transfer"))
 async def transfer_command(message: types.Message):
@@ -418,6 +555,12 @@ async def transfer_command(message: types.Message):
         receiver.balance += amount
         
         tx = create_transaction(db, sender.id, receiver.id, amount, "p2p", True)
+        
+        # Generate unique Tx Hash (SHA-256) (Pro Spec)
+        import hashlib
+        tx_data = f"{tx.id}-{tx.sender_id}-{tx.receiver_id}-{tx.amount}-{tx.timestamp}-{random.random()}"
+        tx.tx_hash = hashlib.sha256(tx_data.encode()).hexdigest()
+        
         db.add(tx)
         db.commit()
         
@@ -431,7 +574,33 @@ async def transfer_command(message: types.Message):
             except:
                 pass
 
-@dp.message(Command("referral"))
+@dp.callback_query(lambda c: c.data.startswith('history_'))
+async def handle_history_callback(callback: CallbackQuery):
+    """Show transaction history via inline button"""
+    user_id = int(callback.data.split('_')[1])
+    with next(get_db()) as db:
+        user = db.get(User, user_id)
+        if not user or user.tg_id != callback.from_user.id:
+            await callback.answer("Access Denied!", show_alert=True)
+            return
+            
+        transactions = db.query(Transaction).filter(
+            (Transaction.sender_id == user.id) | (Transaction.receiver_id == user.id)
+        ).order_by(Transaction.id.desc()).limit(5).all()
+        
+        if not transactions:
+            await callback.answer("No transactions found yet.", show_alert=True)
+            return
+            
+        text = "📜 **RECENT TRANSACTIONS**\n\n"
+        for tx in transactions:
+            icon = "✅" if tx.is_approved else "⏳"
+            arrow = "📤" if tx.sender_id == user.id else "📥"
+            text += f"{icon} {arrow} {tx.amount} UC ({tx.transaction_type})\n"
+            text += f"   _{tx.timestamp.strftime('%m-%d %H:%M')}_\n\n"
+            
+        await callback.message.answer(text, parse_mode="Markdown")
+        await callback.answer()
 async def referral_command(message: types.Message):
     """Handle referral command"""
     with next(get_db()) as db:

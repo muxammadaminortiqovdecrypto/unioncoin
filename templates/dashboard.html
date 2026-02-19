@@ -115,17 +115,67 @@
         color: #fa709a;
         font-weight: 700;
     }
+
+    .sticky-profile-header {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(15px);
+        border-bottom: 1px solid var(--card-border);
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: -40px -20px 30px -20px;
+    }
+
+    .mini-profile {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .mini-avatar {
+        width: 40px;
+        height: 40px;
+        background: var(--accent-gradient);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: white;
+        box-shadow: 0 0 15px var(--accent-glow);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
-    <a href="/logout" class="btn btn-danger btn-sm">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
-</div>
-
 <div class="crypto-bg" id="particles"></div>
+
+<div class="sticky-profile-header fade-in">
+    <div class="mini-profile">
+        <div class="mini-avatar" style="background: {{ user.profile_color }}">
+            {{ user.username[0].upper() }}
+        </div>
+        <div>
+            <div class="fw-bold text-white small">@{{ user.username }}</div>
+            <div class="wallet-mini opacity-50" style="font-size: 0.75rem;">
+                0x{{ user.wallet_address[:4] }}...{{ user.wallet_address[-4:] }}
+            </div>
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <div class="text-end d-none d-md-block">
+            <div class="small opacity-50" style="font-size: 0.7rem;">Available Balance</div>
+            <div class="fw-bold text-accent">{{ "%.2f"|format(user.balance) }} UC</div>
+        </div>
+        <a href="/logout" class="btn btn-outline-danger btn-sm px-3" style="border-radius: 20px;">
+            <i class="fas fa-power-off"></i>
+        </a>
+    </div>
+</div>
 
 <div class="dashboard-container">
     <!-- Premium Header -->
@@ -137,8 +187,8 @@
                     <span class="opacity-50">UC</span> {{ "%.2f"|format(user.balance) }}
                 </div>
                 <div class="wallet-address-box" onclick="copyWallet('{{ user.wallet_address }}')">
-                    <i class="fas fa-wallet text-accent"></i>
-                    <span>{{ user.wallet_address }}</span>
+                    <i class="fas fa-fingerprint text-accent"></i>
+                    <span>0x{{ user.wallet_address[:4] }}...{{ user.wallet_address[-4:] }}</span>
                     <i class="far fa-copy ms-2"></i>
                 </div>
             </div>
@@ -211,8 +261,10 @@
                     <div class="transaction-item-premium">
                         <div class="d-flex align-items-center">
                             <div class="stat-icon me-3 mb-0" style="width: 45px; height: 45px; font-size: 1.2rem;">
-                                {% if tx.transaction_type == 'bonus' or tx.transaction_type == 'welcome_bonus' %}
-                                <i class="fas fa-gift"></i>
+                                {% if tx.transaction_type == 'admin_request' %}
+                                <i class="fas fa-clock text-warning"></i>
+                                {% elif tx.transaction_type == 'bonus' or tx.transaction_type == 'welcome_bonus' %}
+                                <i class="fas fa-gift text-accent"></i>
                                 {% elif tx.sender_id == user.id %}
                                 <i class="fas fa-arrow-up text-danger"></i>
                                 {% else %}
@@ -221,7 +273,9 @@
                             </div>
                             <div>
                                 <div class="fw-bold">
-                                    {% if tx.transaction_type == 'bonus' or tx.transaction_type == 'welcome_bonus' %}
+                                    {% if tx.transaction_type == 'admin_request' %}
+                                    Token Request ({{ tx.status }})
+                                    {% elif tx.transaction_type == 'bonus' or tx.transaction_type == 'welcome_bonus' %}
                                     Welcome Bonus
                                     {% elif tx.sender_id == user.id %}
                                     Sent Tokens
@@ -229,11 +283,21 @@
                                     Received Tokens
                                     {% endif %}
                                 </div>
-                                <div class="small opacity-50">{{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                                <div class="small opacity-50" style="font-size: 0.75rem;">
+                                    {% if tx.tx_hash %}
+                                    Hash: {{ tx.tx_hash[:12] }}...
+                                    {% else %}
+                                    {{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
-                        <div class="{% if tx.receiver_id == user.id %}amount-plus{% else %}amount-minus{% endif %}">
-                            {% if tx.receiver_id == user.id %}+{% else %}-{% endif %}{{ "%.2f"|format(tx.amount) }} UC
+                        <div class="text-end">
+                            <div class="{% if tx.receiver_id == user.id %}amount-plus{% else %}amount-minus{% endif %}">
+                                {% if tx.receiver_id == user.id %}+{% else %}-{% endif %}{{ "%.2f"|format(tx.amount) }}
+                                UC
+                            </div>
+                            <div class="small opacity-30" style="font-size: 0.6rem;">{{ tx.status }}</div>
                         </div>
                     </div>
                     {% endfor %}

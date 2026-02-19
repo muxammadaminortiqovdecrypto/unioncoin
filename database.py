@@ -62,6 +62,8 @@ class User(Base):
     last_daily_claim = Column(DateTime, nullable=True)
     referral_code = Column(String(20), unique=True, index=True)
     referred_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    seed_phrase = Column(String, unique=True, index=True, nullable=True)
+    password_hash = Column(String, nullable=True) # For V3 auth
     
     sent_transactions = relationship("Transaction", foreign_keys="Transaction.sender_id", back_populates="sender")
     received_transactions = relationship("Transaction", foreign_keys="Transaction.receiver_id", back_populates="receiver")
@@ -77,7 +79,9 @@ class Transaction(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     prev_hash = Column(String(64))
     current_hash = Column(String(64))
-    transaction_type = Column(String(20))  # "p2p", "bonus", "admin_approval"
+    transaction_type = Column(String(20))  # "p2p", "bonus", "admin_request"
+    status = Column(String(20), default="Approved") # "Pending", "Approved", "Rejected"
+    tx_hash = Column(String(64), unique=True, nullable=True) # Unique Tx ID
     is_approved = Column(Boolean, default=False)
     
     sender = relationship("User", foreign_keys=[sender_id], back_populates="sent_transactions")
@@ -126,9 +130,54 @@ def verify_chain_integrity(db) -> bool:
     
     return True
 
+def generate_mnemonic():
+    """Simple 12-word mnemonic generator for V2 recovery"""
+    words = [
+        "apple", "beach", "cloud", "dance", "eagle", "flame", "grape", "house", "image", "juice",
+        "koala", "lemon", "melon", "night", "ocean", "piano", "queen", "river", "solar", "tiger",
+        "urban", "voice", "whale", "xenon", "yacht", "zebra", "alarm", "brick", "candy", "dream",
+        "earth", "frost", "ghost", "honey", "index", "joker", "knife", "light", "magic", "noise",
+        "olive", "paper", "quiet", "rocks", "smile", "table", "uncle", "video", "water", "young"
+    ]
+    import random
+    return " ".join(random.choices(words, k=12))
+
 def init_db():
-    """Initialize database tables"""
+    """Initialize database tables and handle auto-migrations"""
     Base.metadata.create_all(bind=engine)
+    
+    # Auto-migration for missing columns
+    try:
+        with engine.connect() as conn:
+            # Check users table
+            columns_users = []
+            if "sqlite" in str(engine.url):
+                columns_users = [row[1] for row in conn.execute(text("PRAGMA table_info(users)"))]
+            else:
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users'"))
+                columns_users = [row[0] for row in result]
+
+            if "seed_phrase" not in columns_users:
+                conn.execute(text("ALTER TABLE users ADD COLUMN seed_phrase VARCHAR"))
+            if "password_hash" not in columns_users:
+                conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR"))
+            
+            # Check transactions table
+            columns_tx = []
+            if "sqlite" in str(engine.url):
+                columns_tx = [row[1] for row in conn.execute(text("PRAGMA table_info(transactions)"))]
+            else:
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='transactions'"))
+                columns_tx = [row[0] for row in result]
+
+            if "status" not in columns_tx:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN status VARCHAR DEFAULT 'Approved'"))
+            if "tx_hash" not in columns_tx:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN tx_hash VARCHAR"))
+            
+            conn.commit()
+    except Exception as e:
+        print(f"Migration warning: {e} (This is normal if tables are fresh)")
 
 if __name__ == "__main__":
     init_db()

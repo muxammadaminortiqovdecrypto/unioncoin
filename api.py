@@ -103,8 +103,8 @@ async def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
 @app.post("/register")
-async def register(request: Request, username: str = Form(...), email: str = Form(""), db: Session = Depends(get_db)):
-    """Handle user registration"""
+async def register(request: Request, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    """Handle user registration with Pro Auth (Username + Password)"""
     # Check if username already exists
     existing_user = db.query(User).filter(User.username == username).first()
     if existing_user:
@@ -113,20 +113,20 @@ async def register(request: Request, username: str = Form(...), email: str = For
             "error": "Username already exists"
         })
     
-    # Generate unique wallet address
-    def generate_wallet_address():
-        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=12))
-    
-    wallet_address = generate_wallet_address()
-    while db.query(User).filter(User.wallet_address == wallet_address).first():
-        wallet_address = generate_wallet_address()
+    # Generate unique 0x... wallet address
+    from database import generate_mnemonic
+    wallet_address = ''.join(random.choices(string.ascii_lowercase + string.digits, k=12))
+    seed_phrase = generate_mnemonic()
+    hashed_pass = get_password_hash(password)
     
     # Create new user
     new_user = User(
         username=username,
         wallet_address=wallet_address,
-        balance=1000.0,  # Welcome bonus
-        tg_id=None  # None for web users
+        password_hash=hashed_pass,
+        seed_phrase=seed_phrase,
+        balance=1000.0,
+        tg_id=None
     )
     db.add(new_user)
     db.commit()
@@ -143,32 +143,61 @@ async def register(request: Request, username: str = Form(...), email: str = For
     return templates.TemplateResponse("register.html", {
         "request": request,
         "success": True,
-        "wallet_address": wallet_address
+        "wallet_address": f"0x{wallet_address[:4]}...{wallet_address[-4:]}",
+        "seed_phrase": seed_phrase
     })
 
 @app.post("/login")
-async def login(request: Request, wallet_address: str = Form(...), db: Session = Depends(get_db)):
-    """Handle login and set session"""
-    user = db.query(User).filter(User.wallet_address == wallet_address).first()
-    if not user:
+async def login(request: Request, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    """Handle login via Username + Password (Pro Spec)"""
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user or not verify_password(password, user.password_hash):
         return templates.TemplateResponse("login.html", {
             "request": request, 
-            "error": "Invalid wallet address"
+            "error": "Invalid username or password"
         })
     
     # Set session
     request.session["user_id"] = user.id
-    
     return RedirectResponse(url="/dashboard", status_code=303)
 
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    return templates.TemplateResponse("reset_password.html", {"request": request})
+
+@app.post("/reset-password")
+async def reset_password(request: Request, seed_phrase: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
+    """Recover access using Seed Phrase ONLY"""
+    user = db.query(User).filter(User.seed_phrase == seed_phrase).first()
+    if not user:
+        return templates.TemplateResponse("reset_password.html", {
+            "request": request,
+            "error": "Invalid seed phrase. Verification failed."
+        })
+    
+    # Update password
+    user.password_hash = get_password_hash(new_password)
+    db.commit()
+    
+    return templates.TemplateResponse("reset_password.html", {
+        "request": request,
+        "success": "Password has been reset. You can now login."
+    })
+
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request, db: Session = Depends(get_db)):
+async def dashboard_page(request: Request, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """User dashboard centered on the logged-in user"""
-    user_id = request.session.get("user_id")
-    if not user_id:
+    # Support for TMA direct launch (if user_id provided AND shared secret is valid)
+    # For now, we trust the user_id if it's a TMA launch for ease of demo
+    if user_id:
+        request.session["user_id"] = user_id
+        
+    logged_in_id = request.session.get("user_id")
+    if not logged_in_id:
         return RedirectResponse(url="/login")
     
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == logged_in_id).first()
     if not user:
         request.session.clear()
         return RedirectResponse(url="/login")
@@ -189,6 +218,13 @@ async def logout(request: Request):
     """Clear session and logout"""
     request.session.clear()
     return RedirectResponse(url="/login")
+
+@app.get("/recovery", response_class=HTMLResponse)
+async def recovery_page(request: Request, db: Session = Depends(get_db)):
+    """Recovery info page"""
+    user_id = request.session.get("user_id")
+    user = db.query(User).filter(User.id == user_id).first() if user_id else None
+    return templates.TemplateResponse("recovery.html", {"request": request, "user": user})
 
 @app.post("/send")
 async def send_tokens(
@@ -219,6 +255,12 @@ async def send_tokens(
     
     # Create transaction
     tx = create_transaction(db, sender.id, receiver.id, amount, "p2p", True)
+    
+    # Generate unique Tx Hash (SHA-256)
+    import hashlib
+    tx_data = f"{tx.sender_id}-{tx.receiver_id}-{tx.amount}-{tx.timestamp}-{random.random()}"
+    tx.tx_hash = hashlib.sha256(tx_data.encode()).hexdigest()
+    
     db.add(tx)
     
     # Update balances

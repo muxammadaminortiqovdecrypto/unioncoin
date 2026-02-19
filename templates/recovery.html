@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Account Recovery - UnionCoin V2{% endblock %}
+
+{% block extra_css %}
+<style>
+    .recovery-card {
+        max-width: 500px;
+        margin: 80px auto;
+        padding: 40px;
+        background: #1e293b;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .recovery-icon {
+        font-size: 4rem;
+        color: #f59e0b;
+        margin-bottom: 20px;
+    }
+
+    .seed-box {
+        background: rgba(0, 0, 0, 0.3);
+        border: 2px dashed rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        border-radius: 12px;
+        margin: 30px 0;
+        font-family: 'Courier New', monospace;
+        color: #38bdf8;
+        font-weight: 700;
+        letter-spacing: 1px;
+        word-spacing: 10px;
+        line-height: 1.8;
+    }
+
+    .btn-return {
+        background: #38bdf8;
+        color: #0f172a;
+        padding: 12px 30px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 700;
+        display: inline-block;
+        transition: all 0.3s;
+    }
+
+    .btn-return:hover {
+        background: #0ea5e9;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="recovery-card fade-in">
+    <div class="recovery-icon"><i class="fas fa-key"></i></div>
+    <h1 class="text-white mb-3">Wallet Recovery</h1>
+    <p class="text-secondary">Your Seed Phrase is the master key to your UnionCoin wallet.
+        Never share it with anyone!</p>
+
+    <div class="seed-box" id="seedPhrase">
+        <!-- Seed phrase will be shown here if the user is authorized -->
+        {% if user %}
+        {{ user.seed_phrase }}
+        {% else %}
+        Please login to view your recovery phrase.
+        {% endif %}
+    </div>
+
+    <div class="alert alert-warning small text-start mb-4">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        If you lose this phrase, we cannot recover your funds. Keep it in a safe, offline place.
+    </div>
+
+    <a href="/dashboard" class="btn-return">
+        <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+    </a>
+</div>
+{% endblock %}
