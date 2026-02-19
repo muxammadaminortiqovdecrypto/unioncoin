@@ -48,8 +48,14 @@ class User(Base):
     is_primary = Column(Boolean, default=False)  # Primary account for multi-account users
     profile_color = Column(String, default="#667eea")  # Profile theme color
     
+    # New features fields
+    last_daily_claim = Column(DateTime, nullable=True)
+    referral_code = Column(String(20), unique=True, index=True)
+    referred_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
     sent_transactions = relationship("Transaction", foreign_keys="Transaction.sender_id", back_populates="sender")
     received_transactions = relationship("Transaction", foreign_keys="Transaction.receiver_id", back_populates="receiver")
+    referred_users = relationship("User", backref=sqlalchemy.orm.backref("referrer", remote_side=[id]))
 
 class Transaction(Base):
     __tablename__ = "transactions"

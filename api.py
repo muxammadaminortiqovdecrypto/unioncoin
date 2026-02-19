@@ -6,14 +6,21 @@ from fastapi import FastAPI, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 from database import get_db, User, Transaction, create_transaction, verify_chain_integrity
 from typing import Optional, List
 import os
 import random
 import string
+import time
+from datetime import datetime
 
 app = FastAPI(title="UnionCoin Web Wallet")
+
+# Add Session Middleware for cookie-based authentication
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-12345")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # Setup templates and static files
 templates = Jinja2Templates(directory="templates")
@@ -24,21 +31,37 @@ async def home_page(request: Request):
     """Home page with crypto theme"""
     return templates.TemplateResponse("crypto_dashboard.html", {"request": request})
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    import time
+    return {"status": "healthy", "timestamp": time.time()}
+
 @app.get("/api/user-accounts")
 async def get_user_accounts(request: Request, db: Session = Depends(get_db)):
-    """Get all user accounts for the dashboard"""
-    # In a real app, we would filter by logged-in user
-    # For this demo, let's show all users as "available accounts" to switch between
-    users = db.query(User).all()
+    """Get all user accounts for the logged-in session"""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse(content=[], status_code=401)
+    
+    # Filter by user_id from session to ensure isolation
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return JSONResponse(content=[], status_code=404)
+    
+    # If the user has multiple accounts (Telegram logic), fetch them all
+    users = [user]
+    if user.tg_id:
+        users = db.query(User).filter(User.tg_id == user.tg_id).all()
     
     accounts = []
-    for user in users:
+    for u in users:
         accounts.append({
-            "username": user.username,
-            "wallet_address": user.wallet_address,
-            "balance": user.balance,
-            "is_primary": user.is_primary,
-            "profile_color": user.profile_color or "#667eea"
+            "username": u.username,
+            "wallet_address": u.wallet_address,
+            "balance": u.balance,
+            "is_primary": u.is_primary,
+            "profile_color": u.profile_color or "#667eea"
         })
     
     return JSONResponse(content=accounts)
@@ -104,6 +127,9 @@ async def register(request: Request, username: str = Form(...), email: str = For
     db.add(bonus_tx)
     db.commit()
     
+    # Auto-login after registration
+    request.session["user_id"] = new_user.id
+    
     return templates.TemplateResponse("register.html", {
         "request": request,
         "success": True,
@@ -112,7 +138,7 @@ async def register(request: Request, username: str = Form(...), email: str = For
 
 @app.post("/login")
 async def login(request: Request, wallet_address: str = Form(...), db: Session = Depends(get_db)):
-    """Handle login"""
+    """Handle login and set session"""
     user = db.query(User).filter(User.wallet_address == wallet_address).first()
     if not user:
         return templates.TemplateResponse("login.html", {
@@ -120,10 +146,33 @@ async def login(request: Request, wallet_address: str = Form(...), db: Session =
             "error": "Invalid wallet address"
         })
     
+    # Set session
+    request.session["user_id"] = user.id
+    
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request, db: Session = Depends(get_db)):
+    """User dashboard centered on the logged-in user"""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        request.session.clear()
+        return RedirectResponse(url="/login")
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "user": user
     })
+
+@app.get("/logout")
+async def logout(request: Request):
+    """Clear session and logout"""
+    request.session.clear()
+    return RedirectResponse(url="/login")
 
 @app.post("/send")
 async def send_tokens(
@@ -173,13 +222,27 @@ async def verify_blockchain(db: Session = Depends(get_db)):
     is_valid = verify_chain_integrity(db)
     return {"blockchain_valid": is_valid}
 
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    """Admin login page"""
+    return templates.TemplateResponse("admin_login.html", {"request": request})
+
+@app.post("/admin/login")
+async def admin_login(request: Request, password: str = Form(...)):
+    """Handle admin login"""
+    if password == os.getenv("ADMIN_PASSWORD", "unioncoin_admin_2026"):
+        request.session["is_admin"] = True
+        return RedirectResponse(url="/api/data", status_code=303)
+    return templates.TemplateResponse("admin_login.html", {
+        "request": request,
+        "error": "Access Denied: Invalid Admin Password"
+    })
+
 @app.get("/api/data", response_class=HTMLResponse)
 async def view_data_api(request: Request, db: Session = Depends(get_db)):
     """View all data via API (ADMIN ONLY)"""
-    # Simple admin check (you can make this more secure)
-    admin_password = request.query_params.get("admin")
-    if admin_password != "unioncoin_admin_2026":
-        return HTMLResponse(content="<h1>Access Denied</h1><p>Admin access required</p>", status_code=403)
+    if not request.session.get("is_admin"):
+        return RedirectResponse(url="/admin/login")
     
     users = db.query(User).all()
     transactions = db.query(Transaction).order_by(Transaction.id.desc()).limit(10).all()

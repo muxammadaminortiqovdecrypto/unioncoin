@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Login - UnionCoin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-login-card {
+        max-width: 400px;
+        margin: 100px auto;
+        padding: 40px;
+        background: #1e293b;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        text-align: center;
+    }
+
+    .admin-icon {
+        font-size: 4rem;
+        color: #38bdf8;
+        margin-bottom: 20px;
+    }
+
+    .admin-title {
+        color: white;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 30px;
+    }
+
+    .admin-input {
+        width: 100%;
+        padding: 12px 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        color: white;
+        margin-bottom: 20px;
+        outline: none;
+    }
+
+    .admin-input:focus {
+        border-color: #38bdf8;
+    }
+
+    .admin-btn {
+        width: 100%;
+        padding: 12px;
+        background: #38bdf8;
+        color: #0f172a;
+        border: none;
+        border-radius: 10px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .admin-btn:hover {
+        background: #0ea5e9;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-login-card fade-in">
+    <div class="admin-icon"><i class="fas fa-user-shield"></i></div>
+    <div class="admin-title">Admin Authorization</div>
+
+    {% if error %}
+    <div class="alert alert-danger" style="margin-bottom: 20px;">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/admin/login">
+        <input type="password" name="password" class="admin-input" placeholder="Enter Admin Password" required>
+        <button type="submit" class="admin-btn">Unlock Records</button>
+    </form>
+
+    <div style="margin-top: 20px;">
+        <a href="/" style="color: rgba(255,255,255,0.4); text-decoration: none; font-size: 0.9rem;">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -13,20 +13,38 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQu
 from sqlalchemy.orm import Session
 from database import get_db, User, Transaction, create_transaction, init_db
 import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Bot configuration
-BOT_TOKEN = "8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTbZom9_7A"
-ADMIN_ID = 1685342390
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTbZom9_7A")
+ADMIN_ID = int(os.getenv("ADMIN_ID", 1685342390))
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+
+# Simple logging middleware to show bot activity
+@dp.update.outer_middleware()
+async def log_update_middleware(handler, event, data):
+    if event.message:
+        print(f"📩 Bot received message: '{event.message.text}' from @{event.message.from_user.username}")
+    elif event.callback_query:
+        print(f"🖱️ Bot received callback: '{event.callback_query.data}' from @{event.callback_query.from_user.username}")
+    return await handler(event, data)
 
 def generate_wallet_address():
     """Generate 12-character unique wallet address"""
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=12))
 
-def get_or_create_user(db: Session, tg_id: int, username: str) -> User:
-    """Get existing user or create new one"""
+def generate_referral_code():
+    """Generate 8-character unique referral code"""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+def get_or_create_user(db: Session, tg_id: int, username: str, referrer_code: str = None) -> User:
+    """Get existing user or create new one with referral support"""
     user = db.query(User).filter(User.tg_id == tg_id).first()
     if not user:
         # Generate unique wallet address
@@ -34,10 +52,24 @@ def get_or_create_user(db: Session, tg_id: int, username: str) -> User:
         while db.query(User).filter(User.wallet_address == wallet_address).first():
             wallet_address = generate_wallet_address()
         
+        # Generate unique referral code
+        referral_code = generate_referral_code()
+        while db.query(User).filter(User.referral_code == referral_code).first():
+            referral_code = generate_referral_code()
+        
+        # Handle referral
+        referred_by_id = None
+        if referrer_code:
+            referrer = db.query(User).filter(User.referral_code == referrer_code).first()
+            if referrer:
+                referred_by_id = referrer.id
+        
         user = User(
             tg_id=tg_id,
             username=username,
             wallet_address=wallet_address,
+            referral_code=referral_code,
+            referred_by_id=referred_by_id,
             balance=1000.0,  # Welcome bonus
             is_primary=True,
             profile_color=random.choice(["#667eea", "#f093fb", "#4facfe", "#fa709a", "#fee140", "#00d4ff"])
@@ -49,99 +81,72 @@ def get_or_create_user(db: Session, tg_id: int, username: str) -> User:
         # Create welcome bonus transaction
         bonus_tx = create_transaction(db, 0, user.id, 1000.0, "welcome_bonus", True)
         db.add(bonus_tx)
+        
+        # Give bonus to referrer if exists
+        if referred_by_id:
+            ref_bonus = 200.0  # Referral bonus
+            referrer = db.get(User, referred_by_id)
+            referrer.balance += ref_bonus
+            ref_tx = create_transaction(db, 0, referrer.id, ref_bonus, "referral_bonus", True)
+            db.add(ref_tx)
+            
+            # Try to notify referrer
+            try:
+                asyncio.create_task(bot.send_message(
+                    referrer.tg_id, 
+                    f"🎊 **NEW REFERRAL!** 🎊\n\nYour friend @{user.username} joined!\nYou received **{ref_bonus} UC** bonus!"
+                ))
+            except:
+                pass
+                
         db.commit()
     
     return user
 
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
-    """Handle /start command with enhanced user experience"""
+    """Handle /start command with enhanced user experience and referral tracking"""
+    # Check for referral code in start command
+    args = message.text.split()
+    referrer_code = args[1] if len(args) > 1 else None
+    
     with next(get_db()) as db:
-        # Check if user already exists
-        user = db.query(User).filter(User.tg_id == message.from_user.id).first()
+        # Get or create user
+        user = get_or_create_user(
+            db, 
+            message.from_user.id, 
+            message.from_user.username or f"user_{message.from_user.id}",
+            referrer_code
+        )
         
-        if user:
-            # Welcome back message with account switcher
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="💼 My Accounts", callback_data=f"accounts_{message.from_user.id}")],
-                [InlineKeyboardButton(text="📊 Balance", callback_data=f"balance_{user.id}")],
-                [InlineKeyboardButton(text="📤 Send Tokens", callback_data=f"send_{user.id}")]
-            ])
-            
-            welcome_text = f"""
-🎉 **Welcome back to UnionCoin!** 🎉
+        # Main keyboard
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💰 Daily Bonus", callback_data=f"daily_{user.id}")],
+            [InlineKeyboardButton(text="💳 Wallet", callback_data=f"profile_{user.id}"),
+             InlineKeyboardButton(text="📊 Stats", callback_data=f"balance_{user.id}")],
+            [InlineKeyboardButton(text="📤 Send", callback_data=f"send_{user.id}"),
+             InlineKeyboardButton(text="👥 Referrals", callback_data=f"referral_{user.id}")],
+            [InlineKeyboardButton(text="📜 History", callback_data=f"history_{user.id}")],
+            [InlineKeyboardButton(text="💼 Accounts", callback_data=f"accounts_{user.tg_id}")]
+        ])
+        
+        welcome_text = f"""
+🚀 **Welcome to UnionCoin!** 🚀
 
-👤 **Your Profile:**
-🆔 **Username:** @{user.username}
+👤 **Profile:** @{user.username}
 💳 **Wallet:** `{user.wallet_address}`
 💰 **Balance:** {user.balance:.2f} UC
-🎨 **Profile Color:** {user.profile_color}
+🎟️ **Ref Code:** `{user.referral_code}`
 
-📅 **Member Since:** {user.created_at.strftime('%Y-%m-%d')}
+✨ **New Features:**
+• 🎁 `/daily` - Claim free UC every day!
+• 💸 `/transfer` - Send UC to anyone
+• 👥 `/referral` - Invite friends and earn
+• 📜 `/history` - View your transactions
 
-Choose an action below or manage multiple accounts!
-            """
-            await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
-        else:
-            # New user registration with enhanced experience
-            # Generate unique wallet address
-            wallet_address = generate_wallet_address()
-            while db.query(User).filter(User.wallet_address == wallet_address).first():
-                wallet_address = generate_wallet_address()
-            
-            # Generate random profile color
-            profile_color = random.choice(["#667eea", "#f093fb", "#4facfe", "#fa709a", "#fee140", "#00d4ff"])
-            
-            # Create new user
-            new_user = User(
-                tg_id=message.from_user.id,
-                username=message.from_user.username or f"user_{message.from_user.id}",
-                wallet_address=wallet_address,
-                balance=1000.0,  # Welcome bonus
-                is_primary=True,
-                profile_color=profile_color
-            )
-            db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
-            
-            # Create welcome bonus transaction
-            bonus_tx = create_transaction(db, 0, new_user.id, 1000.0, "welcome_bonus", True)
-            db.add(bonus_tx)
-            db.commit()
-            
-            # Enhanced welcome message
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🎉 View Profile", callback_data=f"profile_{new_user.id}")],
-                [InlineKeyboardButton(text="💰 Check Balance", callback_data=f"balance_{new_user.id}")],
-                [InlineKeyboardButton(text="📤 Send First Transfer", callback_data=f"send_{new_user.id}")],
-                [InlineKeyboardButton(text="➕ Add Another Account", callback_data=f"add_account_{message.from_user.id}")]
-            ])
-            
-            welcome_text = f"""
-🚀 **Welcome to UnionCoin Ecosystem!** 🚀
-
-🎊 **CONGRATULATIONS!** You've received:
-💰 **1000 UC Welcome Bonus!**
-
-👤 **Your New Profile:**
-🆔 **Username:** @{new_user.username}
-💳 **Wallet:** `{new_user.wallet_address}`
-💰 **Balance:** {new_user.balance:.2f} UC
-🎨 **Profile Theme:** {profile_color}
-
-📅 **Created:** {new_user.created_at.strftime('%Y-%m-%d %H:%M')}
-
-🔥 **Ready to start trading!** Choose an action below:
-
-✨ **Features Available:**
-• 💸 Instant P2P transfers
-• 🤖 Telegram bot control
-• 🌐 Modern web interface
-• 🔒 Blockchain security
-• 👥 Multi-account support (up to 3)
-            """
-            await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
+Select an option below to getting started!
+        """
+        await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
 
 @dp.callback_query(lambda c: c.data.startswith('accounts_'))
 async def handle_accounts(callback: CallbackQuery):
@@ -325,9 +330,203 @@ async def balance_command(message: types.Message):
     with next(get_db()) as db:
         user = db.query(User).filter(User.tg_id == message.from_user.id).first()
         if user:
-            await message.answer(f"Your balance: {user.balance:.2f} UC\nWallet: `{user.wallet_address}`", parse_mode="Markdown")
+            await message.answer(f"💰 **Balance:** {user.balance:.2f} UC\n💳 **Wallet:** `{user.wallet_address}`", parse_mode="Markdown")
         else:
             await message.answer("Please use /start to register first.")
+
+@dp.message(Command("daily"))
+async def daily_command(message: types.Message):
+    """Handle daily bonus command"""
+    with next(get_db()) as db:
+        user = db.query(User).filter(User.tg_id == message.from_user.id).first()
+        if not user:
+            await message.answer("Please use /start to register first.")
+            return
+            
+        now = datetime.utcnow()
+        if user.last_daily_claim and (now - user.last_daily_claim) < timedelta(days=1):
+            next_claim = user.last_daily_claim + timedelta(days=1)
+            remaining = next_claim - now
+            hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+            minutes, _ = divmod(remainder, 60)
+            await message.answer(f"⏳ **Already claimed!**\n\nCome back in **{hours}h {minutes}m**.")
+            return
+            
+        bonus_amount = 100.0
+        user.balance += bonus_amount
+        user.last_daily_claim = now
+        
+        tx = create_transaction(db, 0, user.id, bonus_amount, "daily_bonus", True)
+        db.add(tx)
+        db.commit()
+        
+        await message.answer(f"🎁 **DAILY BONUS!** 🎁\n\nYou received **{bonus_amount} UC**!\nCurrent balance: **{user.balance:.2f} UC**")
+
+@dp.callback_query(lambda c: c.data.startswith('daily_'))
+async def handle_daily_callback(callback: CallbackQuery):
+    """Handle daily bonus button"""
+    # Simply call the command logic or repeat it
+    await callback.answer("Claiming daily bonus...")
+    # For now, just send the command message
+    await daily_command(callback.message)
+
+@dp.message(Command("transfer"))
+async def transfer_command(message: types.Message):
+    """Handle /transfer <wallet/username> <amount>"""
+    args = message.text.split()
+    if len(args) < 3:
+        await message.answer("📝 **Usage:** `/transfer <wallet_address/username> <amount>`\nExample: `/transfer uxammadamin 100`", parse_mode="Markdown")
+        return
+        
+    target_id_or_name = args[1].replace('@', '')
+    try:
+        amount = float(args[2])
+    except ValueError:
+        await message.answer("❌ Invalid amount!")
+        return
+        
+    if amount <= 0:
+        await message.answer("❌ Amount must be positive!")
+        return
+        
+    with next(get_db()) as db:
+        sender = db.query(User).filter(User.tg_id == message.from_user.id).first()
+        if not sender:
+            await message.answer("Please use /start to register first.")
+            return
+            
+        if sender.balance < amount:
+            await message.answer(f"❌ **Insufficient balance!**\nYou have {sender.balance:.2f} UC")
+            return
+            
+        # Find receiver
+        receiver = db.query(User).filter(
+            (User.wallet_address == target_id_or_name) | 
+            (User.username == target_id_or_name)
+        ).first()
+        
+        if not receiver:
+            await message.answer("❌ **User not found!**\nCheck the wallet address or username.")
+            return
+            
+        if receiver.id == sender.id:
+            await message.answer("❌ You cannot send to yourself!")
+            return
+            
+        # Execute transfer
+        sender.balance -= amount
+        receiver.balance += amount
+        
+        tx = create_transaction(db, sender.id, receiver.id, amount, "p2p", True)
+        db.add(tx)
+        db.commit()
+        
+        # Notify sender
+        await message.answer(f"✅ **Transfer Successful!**\n\nSent **{amount} UC** to @{receiver.username}\nNew balance: **{sender.balance:.2f} UC**")
+        
+        # Notify receiver
+        if receiver.tg_id:
+            try:
+                await bot.send_message(receiver.tg_id, f"📥 **Received Tokens!**\n\n@{sender.username} sent you **{amount} UC**!\nNew balance: **{receiver.balance:.2f} UC**")
+            except:
+                pass
+
+@dp.message(Command("referral"))
+async def referral_command(message: types.Message):
+    """Handle referral command"""
+    with next(get_db()) as db:
+        user = db.query(User).filter(User.tg_id == message.from_user.id).first()
+        if not user:
+            await message.answer("Please use /start to register first.")
+            return
+            
+        bot_info = await bot.get_me()
+        ref_link = f"https://t.me/{bot_info.username}?start={user.referral_code}"
+        
+        # Count referrals
+        ref_count = db.query(User).filter(User.referred_by_id == user.id).count()
+        
+        text = f"""
+👥 **REFERRAL PROGRAM** 👥
+
+Share your link and earn **200 UC** for every friend who joins!
+
+🔗 **Your Link:** `{ref_link}`
+🎟️ **Ref Code:** `{user.referral_code}`
+
+📊 **Your Stats:**
+• Total Referrals: {ref_count}
+• Earned: {ref_count * 200} UC
+
+Invite friends to grow the ecosystem!
+        """
+        await message.answer(text, parse_mode="Markdown")
+
+@dp.message(Command("history"))
+async def history_command(message: types.Message):
+    """Handle /history command"""
+    with next(get_db()) as db:
+        user = db.query(User).filter(User.tg_id == message.from_user.id).first()
+        if not user:
+            await message.answer("Please use /start to register first.")
+            return
+            
+        # Get last 10 transactions
+        transactions = db.query(Transaction).filter(
+            (Transaction.sender_id == user.id) | (Transaction.receiver_id == user.id)
+        ).order_by(Transaction.timestamp.desc()).limit(10).all()
+        
+        if not transactions:
+            await message.answer("📭 No transactions yet.")
+            return
+            
+        text = "📜 **RECENT TRANSACTIONS**\n\n"
+        for tx in transactions:
+            if tx.transaction_type == "welcome_bonus":
+                text += f"🎁 Welcome Bonus: +{tx.amount} UC\n"
+            elif tx.transaction_type == "daily_bonus":
+                text += f"☀️ Daily Bonus: +{tx.amount} UC\n"
+            elif tx.transaction_type == "referral_bonus":
+                text += f"👥 Referral Bonus: +{tx.amount} UC\n"
+            elif tx.sender_id == user.id:
+                # Find receiver name
+                receiver = db.get(User, tx.receiver_id)
+                name = f"@{receiver.username}" if receiver else "Unknown"
+                text += f"📤 Sent to {name}: -{tx.amount} UC\n"
+            else:
+                # Find sender name
+                sender = db.get(User, tx.sender_id)
+                name = f"@{sender.username}" if sender else "Unknown"
+                text += f"📥 Received from {name}: +{tx.amount} UC\n"
+            
+            text += f"   _{tx.timestamp.strftime('%Y-%m-%d %H:%M')}_\n\n"
+            
+        await message.answer(text, parse_mode="Markdown")
+
+@dp.message(Command("help"))
+async def help_command(message: types.Message):
+    """Handle /help command"""
+    text = """
+📖 **UnionCoin Bot Help**
+
+**Basic Commands:**
+• `/start` - Start the bot and view profile
+• `/balance` - Check your UC balance
+• `/history` - View transaction history
+• `/help` - Show this message
+
+**Earning UC:**
+• `/daily` - Claim daily bonus (100 UC)
+• `/referral` - Get your invite link (200 UC per friend)
+
+**Transactions:**
+• `/transfer <username/wallet> <amount>` - Send UC to others
+• `/request` - Request tokens from admin
+
+**Wallet Address:**
+You can find your unique 12-character wallet address in `/start` or `/balance`.
+    """
+    await message.answer(text, parse_mode="Markdown")
 
 @dp.message(Command("request"))
 async def request_command(message: types.Message):
@@ -720,9 +919,16 @@ async def handle_admin_callback(callback: CallbackQuery):
         await callback.answer(f"Error: {str(e)}")
 
 async def main():
-    """Start the bot"""
+    """Start the bot with validation"""
     init_db()
-    print("Bot started successfully!")
+    try:
+        me = await bot.get_me()
+        print(f"✅ Bot connected successfully: @{me.username}")
+    except Exception as e:
+        print(f"❌ Bot connection failed: {e}")
+        return
+
+    print("🚀 Bot polling started...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

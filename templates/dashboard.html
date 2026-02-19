@@ -11,7 +11,7 @@
         margin: 0 auto;
         padding: 40px 20px;
     }
-    
+
     .wallet-header-premium {
         background: var(--card-bg);
         backdrop-filter: blur(20px);
@@ -22,7 +22,7 @@
         position: relative;
         overflow: hidden;
     }
-    
+
     .wallet-header-premium::after {
         content: '';
         position: absolute;
@@ -33,7 +33,7 @@
         background: radial-gradient(circle at 70% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 70%);
         pointer-events: none;
     }
-    
+
     .balance-main {
         font-size: 3.5rem;
         font-weight: 800;
@@ -41,7 +41,7 @@
         margin: 20px 0;
         text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
     }
-    
+
     .wallet-address-box {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -55,20 +55,20 @@
         cursor: pointer;
         transition: all 0.3s ease;
     }
-    
+
     .wallet-address-box:hover {
         background: rgba(255, 255, 255, 0.08);
         border-color: var(--accent-glow);
         color: var(--text-primary);
     }
-    
+
     .action-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 20px;
         margin-bottom: 40px;
     }
-    
+
     .premium-card {
         background: var(--card-bg);
         backdrop-filter: blur(20px);
@@ -77,19 +77,19 @@
         padding: 30px;
         transition: all 0.3s ease;
     }
-    
+
     .premium-card:hover {
         transform: translateY(-5px);
         border-color: var(--accent-glow);
         box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
     }
-    
+
     .transaction-list-premium {
         display: flex;
         flex-direction: column;
         gap: 15px;
     }
-    
+
     .transaction-item-premium {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.05);
@@ -100,18 +100,31 @@
         align-items: center;
         transition: all 0.3s ease;
     }
-    
+
     .transaction-item-premium:hover {
         background: rgba(255, 255, 255, 0.05);
         border-color: rgba(255, 255, 255, 0.1);
     }
-    
-    .amount-plus { color: #00f2fe; font-weight: 700; }
-    .amount-minus { color: #fa709a; font-weight: 700; }
+
+    .amount-plus {
+        color: #00f2fe;
+        font-weight: 700;
+    }
+
+    .amount-minus {
+        color: #fa709a;
+        font-weight: 700;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+<div style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+    <a href="/logout" class="btn btn-danger btn-sm">
+        <i class="fas fa-sign-out-alt"></i> Logout
+    </a>
+</div>
+
 <div class="crypto-bg" id="particles"></div>
 
 <div class="dashboard-container">
@@ -149,7 +162,8 @@
         <button class="btn-crypto" style="background: var(--secondary-gradient)" onclick="showReceiveModal()">
             <i class="fas fa-qrcode me-2"></i> Receive
         </button>
-        <a href="/api/data?admin=unioncoin_admin_2026" class="btn-crypto text-center" style="background: rgba(255,255,255,0.1); border: 1px solid var(--card-border)">
+        <a href="/api/data?admin=unioncoin_admin_2026" class="btn-crypto text-center"
+            style="background: rgba(255,255,255,0.1); border: 1px solid var(--card-border)">
             <i class="fas fa-chart-line me-2"></i> Analytics
         </a>
     </div>
@@ -163,17 +177,19 @@
                 </h3>
                 <form method="post" action="/send">
                     <input type="hidden" name="sender_wallet" value="{{ user.wallet_address }}">
-                    
+
                     <div class="mb-3">
                         <label class="form-label opacity-70 small">Receiver Wallet</label>
-                        <input type="text" name="receiver_wallet" class="crypto-input w-100" placeholder="Enter 12-char address" required>
+                        <input type="text" name="receiver_wallet" class="crypto-input w-100"
+                            placeholder="Enter 12-char address" required>
                     </div>
-                    
+
                     <div class="mb-4">
                         <label class="form-label opacity-70 small">Amount (UC)</label>
-                        <input type="number" name="amount" class="crypto-input w-100" placeholder="0.00" step="0.01" min="0.01" required>
+                        <input type="number" name="amount" class="crypto-input w-100" placeholder="0.00" step="0.01"
+                            min="0.01" required>
                     </div>
-                    
+
                     <button type="submit" class="btn-crypto w-100">
                         Authorize Transaction
                     </button>
@@ -188,7 +204,7 @@
                     <h3 class="mb-0"><i class="fas fa-history text-accent me-2"></i> Activity</h3>
                     <a href="#" class="small text-accent text-decoration-none">View All</a>
                 </div>
-                
+
                 <div class="transaction-list-premium">
                     <div class="transaction-item-premium">
                         <div class="d-flex align-items-center">
@@ -202,7 +218,7 @@
                         </div>
                         <div class="amount-plus">+1,000.00 UC</div>
                     </div>
-                    
+
                     <!-- We'll populate more here via API later if needed -->
                     <div class="text-center py-4 opacity-50 small">
                         Blockchain integrity verified <i class="fas fa-shield-alt text-success ms-1"></i>
@@ -221,7 +237,7 @@
     function createParticles() {
         const particlesContainer = document.getElementById('particles');
         const particleCount = 40;
-        
+
         for (let i = 0; i < particleCount; i++) {
             const particle = document.createElement('div');
             particle.className = 'crypto-particle';

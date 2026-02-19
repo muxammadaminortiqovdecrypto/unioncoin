@@ -1,251 +1,49 @@
-name: Deploy UnionCoin to Production
+name: UnionCoin CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ master ]
+    branches: [ main, master ]
   workflow_dispatch:
-    inputs:
-      server_action:
-        description: 'Server action to perform'
-        required: true
-        default: 'deploy'
-        type: choice
-        options:
-          - deploy
-          - restart
-          - backup
-          - status
-          - stop
 
 jobs:
-  deploy:
+  test:
+    name: Test and Build
     runs-on: ubuntu-latest
-    environment:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      ADMIN_ID: ${{ secrets.ADMIN_ID }}
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      HOST: ${{ secrets.HOST }}
-      DOMAIN: ${{ secrets.DOMAIN }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-        
+
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install paramiko pandas openpyxl
-        
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            echo "🚀 Starting UnionCoin deployment..."
-            cd /var/www/unioncoin
-            
-            # Create backup before deployment
-            python -c "
-import sqlite3
-import pandas as pd
-from datetime import datetime
-import subprocess
-import os
 
-# Create backup
-conn = sqlite3.connect('unioncoin.db')
-users_df = pd.read_sql_query('SELECT * FROM users', conn)
-transactions_df = pd.read_sql_query('SELECT t.*, s.username as sender_name, r.username as receiver_name FROM transactions t LEFT JOIN users s ON t.sender_id = s.id LEFT JOIN users r ON t.receiver_id = r.id ORDER BY t.id DESC', conn)
-
-backup_dir = f'backups/{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}'
-os.makedirs(backup_dir, exist_ok=True)
-
-users_df.to_excel(f'{backup_dir}/users.xlsx', index=False)
-transactions_df.to_excel(f'{backup_dir}/transactions.xlsx', index=False)
-conn.close()
-print(f'📊 Backup created: {backup_dir}')
-            "
-            
-            # Update code
-            git pull origin master
-            
-            # Install dependencies
-            source venv/bin/activate
-            pip install -r requirements.txt
-            
-            # Restart services
-            sudo systemctl restart unioncoin-web
-            sudo systemctl restart unioncoin-bot
-            
-            echo "✅ Deployment completed at $(date)"
-            
-      - name: Notify deployment
-        if: success()
-          run: |
-            curl -X POST -H 'Authorization: token ${{ secrets.DEPLOY_TOKEN }}' \
-              -H 'Content-Type: application/json' \
-              -d '{"status": "success", "message": "UnionCoin deployed successfully", "timestamp": "'$(date -Iseconds)'"}' \
-              https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage \
-              -F 'chat_id=${{ secrets.ADMIN_ID }}&text=🚀 UnionCoin deployed successfully to ${{ secrets.DOMAIN }} at $(date)'
-        
-      - name: Deploy failed notification
-        if: failure()
-          run: |
-            curl -X POST -H 'Authorization: token ${{ secrets.DEPLOY_TOKEN }}' \
-              -H 'Content-Type: application/json' \
-              -d '{"status": "failed", "message": "UnionCoin deployment failed", "timestamp": "'$(date -Iseconds)'"}' \
-              https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage \
-              -F 'chat_id=${{ secrets.ADMIN_ID }}&text=❌ UnionCoin deployment failed to ${{ secrets.DOMAIN }}'
-        
-      - name: Cleanup
-        if: always()
-          run: |
-            rm -rf /tmp/unioncoin_deploy_*
-
-  restart:
-    runs-on: ubuntu-latest
-    environment:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      ADMIN_ID: ${{ secrets.ADMIN_ID }}
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      HOST: ${{ secrets.HOST }}
-      DOMAIN: ${{ secrets.DOMAIN }}
-    
-    steps:
-      - name: Restart services
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            echo "🔄 Restarting UnionCoin services..."
-            cd /var/www/unioncoin
-            source venv/bin/activate
-            
-            sudo systemctl restart unioncoin-web
-            sudo systemctl restart unioncoin-bot
-            
-            echo "✅ Services restarted at $(date)"
-        
-      - name: Notify restart
+      - name: Verify Code Syntax
         run: |
-            curl -X POST -H 'Authorization: token ${{ secrets.DEPLOY_TOKEN }}' \
-              -H 'Content-Type: application/json' \
-              -d '{"status": "restarted", "message": "UnionCoin services restarted", "timestamp": "'$(date -Iseconds)'"}' \
-              https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage \
-              -F 'chat_id=${{ secrets.ADMIN_ID }}&text=🔄 UnionCoin services restarted on ${{ secrets.DOMAIN }} at $(date)'
+          python -m py_compile bot.py database.py api.py run.py
 
-  backup:
-    runs-on: ubuntu-latest
-    environment:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      ADMIN_ID: ${{ secrets.ADMIN_ID }}
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      HOST: ${{ secrets.HOST }}
-      DOMAIN: ${{ secrets.DOMAIN }}
-    
-    steps:
-      - name: Create backup
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            echo "📊 Creating backup..."
-            cd /var/www/unioncoin
-            
-            python -c "
-import sqlite3
-import pandas as pd
-from datetime import datetime
-import os
-
-# Create backup
-conn = sqlite3.connect('unioncoin.db')
-users_df = pd.read_sql_query('SELECT * FROM users', conn)
-transactions_df = pd.read_sql_query('SELECT t.*, s.username as sender_name, r.username as receiver_name FROM transactions t LEFT JOIN users s ON t.sender_id = s.id LEFT JOIN users r ON t.receiver_id = r.id ORDER BY t.id DESC', conn)
-
-backup_dir = f'backups/{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}'
-os.makedirs(backup_dir, exist_ok=True)
-
-users_df.to_excel(f'{backup_dir}/users.xlsx', index=False)
-transactions_df.to_excel(f'{backup_dir}/transactions.xlsx', index=False)
-conn.close()
-print(f'📊 Backup created: {backup_dir}')
-            "
-        
-      - name: Upload backup
-        uses: actions/upload-artifact@v3
-        with:
-          name: backup-files
-          path: backups/
-        
-      - name: Notify backup
+      - name: Database Initialization Test
+        env:
+          DATABASE_URL: sqlite:///test.db
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN || 'fake_token' }}
+          ADMIN_ID: ${{ secrets.ADMIN_ID || '12345' }}
         run: |
-          curl -X POST -H 'Authorization: token ${{ secrets.DEPLOY_TOKEN }}' \
-              -H 'Content-Type: application/json' \
-              -d '{"status": "backup", "message": "Backup created", "timestamp": "'$(date -Iseconds)'"}' \
-              https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage \
-              -F 'chat_id=${{ secrets.ADMIN_ID }}&text=📊 UnionCoin backup created on ${{ secrets.DOMAIN }} at $(date)'
+          python database.py
+          echo "✅ Database initialized successfully"
 
-  status:
+  deploy_trigger:
+    name: Deployment Note
     runs-on: ubuntu-latest
-    environment:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      ADMIN_ID: ${{ secrets.ADMIN_ID }}
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      HOST: ${{ secrets.HOST }}
-      DOMAIN: ${{ secrets.DOMAIN }}
-    
+    needs: test
     steps:
-      - name: Check services
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            echo "🔍 Checking UnionCoin services..."
-            
-            # Check web server
-            if curl -f http://localhost:8000/verify --connect-timeout 5 > /dev/null; then
-              echo "✅ Web server: Running"
-            else
-              echo "❌ Web server: Down"
-            fi
-            
-            # Check bot
-            if pgrep -f "python bot.py" > /dev/null; then
-              echo "✅ Bot: Running"
-            else
-              echo "❌ Bot: Down"
-            fi
-            
-            echo "📊 Service status checked at $(date)"
-        
-      - name: Notify status
+      - name: Success Message
         run: |
-          curl -X POST -H 'Authorization: token ${{ secrets.DEPLOY_TOKEN }}' \
-              -H 'Content-Type: application/json' \
-              -d '{"status": "status", "services": {"web": "'$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/verify)'", '"bot": "'$(pgrep -f "python bot.py" && echo "running" || echo "down")"'"}', "timestamp": "'$(date -Iseconds)'"}' \
-              https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage \
-              -F 'chat_id=${{ secrets.ADMIN_ID }}&text=🔍 UnionCoin services status: Web: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/verify)'", Bot: $(pgrep -f "python bot.py" && echo "running" || echo "down")' at $(date)'
+          echo "🚀 Code verified! Render will now automatically deploy if connected."
