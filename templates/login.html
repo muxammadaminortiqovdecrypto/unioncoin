@@ -4,6 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
     .auth-container {
         max-width: 400px;
@@ -161,8 +162,8 @@
             <div class="auth-icon">
                 <i class="fas fa-wallet"></i>
             </div>
-            <h1 class="auth-title">Welcome Back</h1>
-            <p class="auth-subtitle">Login to your UnionCoin wallet</p>
+            <h1 class="auth-title">Account Access</h1>
+            <p class="auth-subtitle">Login with Username or Telegram ID</p>
         </div>
 
         <div class="auth-form card fade-in">
@@ -175,14 +176,14 @@
 
             <form method="post" action="/login">
                 <div class="form-group mb-4">
-                    <label class="form-label" for="username">
-                        <i class="fas fa-at"></i>
-                        Username
+                    <label class="form-label">
+                        <i class="fas fa-fingerprint"></i>
+                        Username or Telegram ID
                     </label>
                     <div class="input-group">
-                        <i class="fas fa-user-circle input-icon"></i>
-                        <input type="text" id="username" name="username" class="form-control"
-                            placeholder="Enter your username" required>
+                        <i class="fas fa-user-shield input-icon"></i>
+                        <input type="text" name="username" class="form-control"
+                            placeholder="e.g. jason_pro or 123456789" required style="text-transform: lowercase;">
                     </div>
                 </div>
 
@@ -211,22 +212,19 @@
             </div>
 
             <div class="social-auth">
-                <a href="/register" class="social-btn">
-                    <i class="fas fa-user-plus"></i>
-                    <span>Create Wallet</span>
-                </a>
-                <a href="/api/data" class="social-btn">
-                    <i class="fas fa-chart-bar"></i>
-                    <span>View Data</span>
+                <a href="https://t.me/tokenuchunku12bot" class="social-btn"
+                    style="border-color: #0088cc; color: #0088cc;">
+                    <i class="fab fa-telegram"></i>
+                    <span>Register on Bot</span>
                 </a>
             </div>
         </div>
 
         <div class="auth-footer">
-            <p>Don't have a wallet? <a href="/register" class="auth-link">Create one now</a></p>
+            <p>New user? <a href="https://t.me/tokenuchunku12bot" class="auth-link">Create account via Telegram</a></p>
             <p style="margin-top: 10px; font-size: 0.9rem; color: #9ca3af;">
-                <i class="fas fa-shield-alt"></i>
-                Your wallet is secured with blockchain technology
+                <i class="fas fa-lock text-success"></i>
+                Official UnionCoin Ultimate System
             </p>
         </div>
     </div>
@@ -235,24 +233,50 @@
 
 {% block extra_js %}
 <script>
-    // Auto-format wallet address
-    document.getElementById('wallet_address').addEventListener('input', function (e) {
-        this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '');
-    });
+    // --- Telegram Mini App Integration ---
+    const tg = window.Telegram.WebApp;
 
-    // Add wallet address validation feedback
-    document.getElementById('wallet_address').addEventListener('blur', function () {
-        const value = this.value.trim();
-        if (value && value.length === 12 && /^[a-z0-9]{12}$/.test(value)) {
-            this.style.borderColor = 'var(--success-color)';
-        } else if (value) {
-            this.style.borderColor = 'var(--danger-color)';
+    document.addEventListener('DOMContentLoaded', async function () {
+        // Expand app for premium feel
+        tg.expand();
+        tg.ready();
+
+        const identifierInput = document.querySelector('input[name="username"]');
+
+        if (tg.initData) {
+            console.log("💎 Telegram Mini App detected. Authenticating...");
+
+            try {
+                const response = await fetch('/auth/telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: tg.initData })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    // Success: Redirect to dashboard
+                    window.location.href = '/dashboard';
+                } else if (response.status === 404) {
+                    // Unregistered: Auto-fill ID and show hint
+                    identifierInput.value = result.tg_id;
+                    tg.showPopup({
+                        title: 'Account Not Found',
+                        message: 'Your ID is auto-filled. Please set a password in the @tokenuchunku12bot first.',
+                        buttons: [{ type: 'ok' }]
+                    });
+                }
+            } catch (err) {
+                console.error("Auth error:", err);
+            }
         }
     });
 
-    // Focus on wallet address input
+    // --- UI Helpers ---
     document.addEventListener('DOMContentLoaded', function () {
-        document.getElementById('wallet_address').focus();
+        const identifierInput = document.querySelector('input[name="username"]');
+        if (identifierInput) identifierInput.focus();
     });
 </script>
 {% endblock %}

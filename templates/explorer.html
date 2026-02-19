@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnionCoin Pro Explorer</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --card-glass: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background Glows */
+        .glow-1 {
+            position: fixed;
+            top: -10%;
+            left: -10%;
+            width: 40vw;
+            height: 40vw;
+            background: var(--accent-glow);
+            filter: blur(120px);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        .glow-2 {
+            position: fixed;
+            bottom: -10%;
+            right: -10%;
+            width: 30vw;
+            height: 30vw;
+            background: rgba(139, 92, 246, 0.2);
+            filter: blur(100px);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1200px;
+            padding: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            margin-top: 2rem;
+        }
+
+        .search-box {
+            background: var(--card-glass);
+            backdrop-filter: blur(20px);
+            padding: 2rem;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            margin-bottom: 2rem;
+        }
+
+        .search-box h1 {
+            margin: 0 0 1.5rem 0;
+            font-size: 2rem;
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            gap: 1rem;
+        }
+
+        input {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s;
+        }
+
+        button:hover {
+            background: #4f46e5;
+            transform: translateY(-2px);
+        }
+
+        .result-card {
+            background: var(--card-glass);
+            backdrop-filter: blur(20px);
+            padding: 2.5rem;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+        }
+
+        .status-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .status-burned {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        .value {
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent);
+        }
+
+        .hash-display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: 12px;
+            margin-top: 1.5rem;
+            word-break: break-all;
+            border-left: 4px solid var(--accent);
+        }
+
+        .no-result {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-dim);
+        }
+
+        @media (max-width: 600px) {
+            form {
+                flex-direction: column;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .value {
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="glow-1"></div>
+    <div class="glow-2"></div>
+
+    <header>
+        <a href="/dashboard" class="logo">UNIONCOIN PRO</a>
+        <div style="font-size: 0.8rem; color: var(--text-dim);">Finalizing Blockchain Explorer</div>
+    </header>
+
+    <div class="container">
+        <div class="search-box">
+            <h1>Transaction Explorer</h1>
+            <form action="/explorer" method="get">
+                <input type="text" name="tx_hash" placeholder="Enter Transaction Hash (SHA-256)"
+                    value="{{ tx_hash if tx_hash else '' }}" required>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        {% if transaction %}
+        <div class="result-card">
+            <div
+                class="status-badge {{ 'status-success' if transaction.status == 'SUCCESS' or transaction.status == 'Approved' else 'status-burned' if transaction.status == 'BURNED' else 'status-pending' }}">
+                {{ transaction.status }}
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Sender</span>
+                <span class="value mono">{{ transaction.sender.wallet_address if transaction.sender else 'SYSTEM'
+                    }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Receiver</span>
+                <span class="value mono">{{ transaction.receiver.wallet_address if transaction.receiver else
+                    '000000000000 (BURN)' }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Amount</span>
+                <span class="value" style="font-size: 1.2rem; color: var(--accent);">{{ transaction.amount }} UC</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Timestamp</span>
+                <span class="value">{{ transaction.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Type</span>
+                <span class="value">{{ transaction.transaction_type.upper() }}</span>
+            </div>
+
+            <div class="hash-display">
+                <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.5rem;">TRANSACTION HASH</div>
+                <div class="mono">{{ transaction.tx_hash }}</div>
+            </div>
+
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <div style="color: var(--success); font-size: 0.8rem; font-weight: 600;">✅ BLOCKCHAIN VERIFIED</div>
+            </div>
+        </div>
+        {% elif tx_hash %}
+        <div class="search-box no-result">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+            <h3>Transaction Not Found</h3>
+            <p>The hash provided does not match any records in the secure ledger.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <footer style="margin-top: auto; padding: 2rem; color: var(--text-dim); font-size: 0.8rem;">
+        &copy; 2026 UnionCoin Pro Ecosystem. Military Grade Traceability.
+    </footer>
+</body>
+
+</html>

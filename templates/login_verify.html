@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Login - UnionCoin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="auth-container text-center" style="max-width: 500px; margin: 100px auto;">
+        <div class="auth-form card fade-in p-5">
+            <div class="mb-4">
+                <i class="fas fa-mobile-alt text-accent" style="font-size: 4rem;"></i>
+            </div>
+            <h2 class="mb-3">Confirm on Telegram</h2>
+            <p class="text-muted mb-4">
+                We've sent a login request to your Telegram account.
+                Please open your bot and click <b>Approve ✅</b> to continue.
+            </p>
+
+            <div class="spinner-border text-accent mb-4" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+
+            <div id="status-msg" class="small text-info mb-4">Waiting for your approval...</div>
+
+            <div class="d-grid gap-2">
+                <a href="/login" class="btn btn-outline-secondary">Cancel Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function checkStatus() {
+        try {
+            const response = await fetch('/login-status/{{ user_id }}');
+            const data = await response.json();
+
+            if (data.status === 'APPROVED') {
+                window.location.href = '/dashboard';
+            } else if (data.status === 'BLOCKED') {
+                window.location.href = '/login?error=Login+denied+by+user';
+            } else {
+                setTimeout(checkStatus, 2000); // Poll every 2 seconds
+            }
+        } catch (e) {
+            console.error("Polling error", e);
+            setTimeout(checkStatus, 5000);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', checkStatus);
+</script>
+{% endblock %}

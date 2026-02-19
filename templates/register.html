@@ -146,18 +146,28 @@
                     <p style="margin-bottom: 5px;"><strong>Your Wallet Address:</strong></p>
                     <div class="wallet-code">{{ wallet_address }}</div>
                     <p style="font-size: 0.9rem; margin-top: 10px;">
+                        <i class="fas fa-fingerprint"></i>
+                        Secure blockchain identifier
+                    </p>
+                </div>
+
+                <div class="bonus-info"
+                    style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4);">
+                    <p><strong>🔐 CRITICAL: Secret Recovery Phrase</strong></p>
+                    <div class="wallet-code"
+                        style="font-size: 1rem; letter-spacing: 0; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+                        {{ seed_phrase }}
+                    </div>
+                    <p style="font-size: 0.8rem; margin-top: 10px; color: #fecaca;">
                         <i class="fas fa-exclamation-triangle"></i>
-                        Save this address securely!
+                        Save this phrase! It is the <strong>ONLY</strong> way to recover your account if you forget your
+                        password.
                     </p>
                 </div>
 
                 <div class="bonus-info">
                     <p><strong>Welcome Bonus Received:</strong></p>
                     <div class="bonus-amount">1000 UC</div>
-                    <p style="font-size: 0.9rem; margin-top: 5px;">
-                        <i class="fas fa-gift"></i>
-                        Ready to use immediately
-                    </p>
                 </div>
 
                 <ul class="features-list">
@@ -168,9 +178,10 @@
                 </ul>
 
                 <div style="margin-top: 25px;">
-                    <a href="/login" class="btn btn-secondary btn-block">
-                        <i class="fas fa-sign-in-alt"></i>
-                        Go to Login
+                    <a href="/dashboard" class="btn btn-primary btn-block"
+                        style="background: var(--accent-gradient); border: none;">
+                        <i class="fas fa-rocket"></i>
+                        Enter Dashboard
                     </a>
                 </div>
             </div>
