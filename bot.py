@@ -20,7 +20,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Bot setup
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTbZom9_7A")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    print("❌ ERROR: BOT_TOKEN environment variable is not set!")
+    exit(1)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 

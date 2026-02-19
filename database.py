@@ -16,6 +16,10 @@ from typing import Optional, List
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./unioncoin.db")
 
+# Render/SQLAlchemy compatibility fix: Replace postgres:// with postgresql://
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 Base = declarative_base()
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

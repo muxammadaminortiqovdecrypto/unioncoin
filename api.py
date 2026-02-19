@@ -107,7 +107,9 @@ def validate_telegram_data(init_data: str) -> Optional[dict]:
     Reference: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
     """
     try:
-        BOT_TOKEN = os.getenv("BOT_TOKEN", "8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTbZom9_7A")
+        BOT_TOKEN = os.getenv("BOT_TOKEN")
+        if not BOT_TOKEN:
+            return None
         parsed_data = dict(urllib.parse.parse_qsl(init_data))
         hash_value = parsed_data.pop('hash', None)
         if not hash_value: return None
@@ -229,7 +231,10 @@ async def login(request: Request, username_or_id: str = Form(..., alias="usernam
     db.commit()
     
     # Send Telegram Confirmation Request
-    BOT_TOKEN = os.getenv("BOT_TOKEN", "8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTbZom9_7A")
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    if not BOT_TOKEN:
+        return RedirectResponse(url=f"/login-verify?user_id={user.id}", status_code=303)
+        
     approve_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     
     keyboard = {
