@@ -1,0 +1,84 @@
+UNIONCOIN DATABASE CONNECTION QUICK FIX
+===============================================
+CRITICAL: DATABASE HOST NAME IS WRONG!
+
+PROBLEM:
+❌ Error: could not translate host name "unioncoin-db.render.com"
+❌ Application exited early
+❌ Database connection failed
+
+SOLUTION:
+🔧 CHANGE DATABASE HOST FROM "unioncoin-db.render.com" TO "dpg-d6c9at15pdvs738si39g-a"
+
+RENDER.COM MANUAL FIX STEPS:
+1. 🌐 Open: https://render.com
+2. 🔍 Find: unioncoin-web service
+3. ⚙️ Go to: Environment tab
+4. 🗑️ DELETE ALL existing environment variables
+5. 📤 ADD NEW environment variables:
+
+CRITICAL ENVIRONMENT VARIABLES:
+=================================
+DATABASE_URL=postgresql://unioncoin_user:R0HqXLoceeHhqba1MokFvWhEDSBcecqd@dpg-d6c9at15pdvs738si39g-a/unioncoin
+
+BOT_TOKEN=8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTZom9_7A
+
+ADMIN_TELEGRAM_ID=1685342390
+
+TELEGRAM_AUTH_ONLY=true
+
+WEB_REGISTRATION_DISABLED=true
+
+ADMIN_ACCESS_TELEGRAM_ONLY=true
+
+SECURITY_LEVEL=maximum
+
+SECRET_KEY=unioncoin_secret_key_2026_secure
+
+ADMIN_PASSWORD=unioncoin_admin_2026
+
+DOMAIN=unioncoin.onrender.com
+
+HOST=0.0.0.0
+
+PORT=8000
+
+DEBUG=false
+
+ADDITIONAL DATABASE VARIABLES:
+===========================
+DATABASE_URL_EXTERNAL=postgresql://unioncoin_user:R0HqXLoceeHhqba1MokFvWhEDSBcecqd@dpg-d6c9at15pdvs738si39g-a.oregon-postgres.render.com/unioncoin
+
+DATABASE_URL_INTERNAL=postgresql://unioncoin_user:R0HqXLoceeHhqba1MokFvWhEDSBcecqd@dpg-d6c9at15pdvs738si39g-a/unioncoin
+
+DB_HOST=dpg-d6c9at15pdvs738si39g-a
+
+DB_HOST_EXTERNAL=dpg-d6c9at15pdvs738si39g-a.oregon-postgres.render.com
+
+DB_PORT=5432
+
+DB_NAME=unioncoin
+
+DB_USER=unioncoin_user
+
+DB_PASSWORD=R0HqXLoceeHhqba1MokFvWhEDSBcecqd
+
+FINAL STEPS:
+6. 💾 Save Changes
+7. 🔄 Wait for automatic redeploy (5-10 minutes)
+8. 🧪 Test: https://unioncoin.onrender.com
+9. 📱 Test: @tokenuchunku12bot
+
+EXPECTED RESULT:
+✅ Database connection successful
+✅ Application starts without errors
+✅ Health check passes
+✅ Users can register and login
+✅ Telegram authentication works
+
+KEY DIFFERENCE:
+❌ OLD (WRONG): unioncoin-db.render.com
+✅ NEW (CORRECT): dpg-d6c9at15pdvs738si39g-a
+
+THIS IS THE ONLY THING YOU NEED TO FIX!
+===============================================
