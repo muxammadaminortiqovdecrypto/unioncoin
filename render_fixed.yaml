@@ -1,0 +1,64 @@
+services:
+  # Web Service
+  - type: web
+    name: unioncoin-web
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn api:app --bind 0.0.0.0:$PORT"
+    healthCheckPath: "/verify"
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        value: "postgresql://unioncoin_user:unioncoin_password@unioncoin-db:5432/unioncoin"
+      - key: BOT_TOKEN
+        value: "8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTbZom9_7A"
+      - key: ADMIN_ID
+        value: "1685342390"
+      - key: SECRET_KEY
+        value: "unioncoin_production_secret_key_2026"
+      - key: ADMIN_PASSWORD
+        value: "unioncoin_admin_2026"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: PORT
+        value: "8000"
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  # PostgreSQL Database
+  - type: pserv
+    name: unioncoin-db
+    env: postgres
+    plan: free
+    databaseName: unioncoin
+    user: unioncoin_user
+    password: unioncoin_password
+    healthCheckPath: "/"
+
+  # Background Bot Service
+  - type: worker
+    name: unioncoin-bot
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python bot.py"
+    envVars:
+      - key: DATABASE_URL
+        value: "postgresql://unioncoin_user:unioncoin_password@unioncoin-db:5432/unioncoin"
+      - key: BOT_TOKEN
+        value: "8362335664:AAHzVL2gFmgu8X3QoxYTiLtZNFTbZom9_7A"
+      - key: ADMIN_ID
+        value: "1685342390"
+      - key: SECRET_KEY
+        value: "unioncoin_production_secret_key_2026"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: PORT
+        value: "8000"
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11"
