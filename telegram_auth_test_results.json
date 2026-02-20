@@ -3,7 +3,7 @@
     "url": "https://unioncoin.onrender.com",
     "description": "Main Page (Telegram Auth Required)",
     "status_code": 200,
-    "response_time": 1.490472,
+    "response_time": 1.062715,
     "content_length": 12587,
     "success": true,
     "content_check": false
@@ -12,8 +12,8 @@
     "url": "https://unioncoin.onrender.com/health",
     "description": "Health Check",
     "status_code": 200,
-    "response_time": 0.873403,
-    "content_length": 50,
+    "response_time": 0.995865,
+    "content_length": 51,
     "success": true,
     "content_check": true
   },
@@ -21,7 +21,7 @@
     "url": "https://unioncoin.onrender.com/verify",
     "description": "Blockchain Verify",
     "status_code": 200,
-    "response_time": 0.800835,
+    "response_time": 0.721348,
     "content_length": 25,
     "success": true,
     "content_check": false
@@ -30,7 +30,7 @@
     "url": "https://unioncoin.onrender.com/register",
     "description": "Register Redirect (Should redirect to Telegram)",
     "status_code": 200,
-    "response_time": 0.957823,
+    "response_time": 1.161794,
     "content_length": 14025,
     "success": true,
     "content_check": false
@@ -39,7 +39,7 @@
     "url": "https://unioncoin.onrender.com/auth/telegram/check/123456789",
     "description": "Check Telegram User (Non-existent)",
     "status_code": 404,
-    "response_time": 1.27327,
+    "response_time": 1.234059,
     "content_length": 22,
     "success": false,
     "content_check": false
@@ -48,7 +48,7 @@
     "url": "https://unioncoin.onrender.com/api/stats/public",
     "description": "Public Stats",
     "status_code": 404,
-    "response_time": 0.870789,
+    "response_time": 1.417247,
     "content_length": 22,
     "success": false,
     "content_check": false
