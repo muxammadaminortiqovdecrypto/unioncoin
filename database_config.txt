@@ -1,0 +1,24 @@
+# UnionCoin Database Configuration
+# Multiple database connection options
+
+# Render Internal Database (Recommended)
+DATABASE_URL_INTERNAL=postgresql://postgres:12345@unioncoin-db:5432/unioncoin
+
+# Render External Database
+DATABASE_URL_EXTERNAL=postgresql://postgres:12345@unioncoin-db.render.com:5432/unioncoin
+
+# Local Database
+DATABASE_URL_LOCAL=postgresql://postgres:12345@localhost:5432/unioncoin
+
+# SQLite Fallback
+DATABASE_URL_SQLITE=sqlite:///unioncoin.db
+
+# Current Active Database
+DATABASE_URL=postgresql://postgres:12345@unioncoin-db:5432/unioncoin
+
+# Database Configuration
+DB_HOST=unioncoin-db
+DB_PORT=5432
+DB_NAME=unioncoin
+DB_USER=postgres
+DB_PASSWORD=12345
