@@ -9,7 +9,7 @@ import sqlalchemy
 from passlib.context import CryptContext
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, ForeignKey, BigInteger
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Session
 from datetime import datetime
 from typing import Optional, List
 
